@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
@@ -179,8 +180,9 @@ export default async function Home() {
         </header>
 
         {/* Card A: 本月評核 */}
-        <section
-          className={`rounded-2xl border-2 ${aStyle.ring} bg-white/80 p-6 shadow-sm backdrop-blur dark:bg-zinc-900/60`}
+        <Link
+          href="/evaluations/me"
+          className={`block rounded-2xl border-2 ${aStyle.ring} bg-white/80 p-6 shadow-sm backdrop-blur transition hover:shadow-md hover:bg-white dark:bg-zinc-900/60 dark:hover:bg-zinc-900/80`}
         >
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
@@ -202,7 +204,7 @@ export default async function Home() {
               {cardAProgress}
             </p>
           )}
-        </section>
+        </Link>
 
         {/* Card B: 歷史紀錄 */}
         <section className="rounded-2xl border-2 border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/60">
