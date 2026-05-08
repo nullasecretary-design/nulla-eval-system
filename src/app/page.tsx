@@ -147,7 +147,7 @@ export default async function Home() {
     cardAMainLabel = cd.label;
     if (progress) {
       if (progress.total === 0) {
-        cardAProgress = '本月你沒有要填的評核';
+        cardAProgress = '本月沒有您需要填的評核';
       } else if (emp.position === '一般員工') {
         cardAProgress =
           progress.done >= progress.total ? '✓ 已完成' : '尚未填寫';
