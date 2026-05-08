@@ -106,12 +106,19 @@ export default async function Home() {
     progress = { total, done };
   }
 
-  // History: do they have any "已填" evaluations as evaluatee?
-  const { count: historyCount } = await supabaseAdmin
+  // History: 算過去有幾個月有評核(以月為單位,不是 row 數)
+  const { data: historyRows } = await supabaseAdmin
     .from('evaluations')
-    .select('id', { count: 'exact', head: true })
+    .select('evaluation_periods!inner(year, month)')
     .eq('evaluatee_id', emp.employee_number)
-    .eq('status', '已填');
+    .eq('status', '已填')
+    .returns<{ evaluation_periods: { year: number; month: number } }[]>();
+  const historyMonthSet = new Set(
+    (historyRows ?? []).map(
+      (r) => `${r.evaluation_periods.year}-${r.evaluation_periods.month}`
+    )
+  );
+  const historyCount = historyMonthSet.size;
 
   // ---------- Card A logic ----------
   let cardATier: CountdownTier;
@@ -207,23 +214,24 @@ export default async function Home() {
         </Link>
 
         {/* Card B: 歷史紀錄 */}
-        <section className="rounded-2xl border-2 border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/60">
+        <Link
+          href="/history"
+          className="block rounded-2xl border-2 border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur transition hover:bg-white hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900/60 dark:hover:bg-zinc-900/80"
+        >
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
               歷史紀錄
             </h2>
           </div>
           <p className="mt-4 text-2xl font-bold text-zinc-700 dark:text-zinc-300">
-            {historyCount && historyCount > 0
-              ? `${historyCount} 筆紀錄`
-              : '尚無紀錄'}
+            {historyCount > 0 ? `過去 ${historyCount} 個月` : '尚無紀錄'}
           </p>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            {historyCount && historyCount > 0
+            {historyCount > 0
               ? '點擊查看每月、每季的詳細分數'
               : '完成第一次評核後,你的歷史紀錄會出現在這'}
           </p>
-        </section>
+        </Link>
 
         {/* Footer note */}
         <p className="mt-2 text-center text-xs text-zinc-400 dark:text-zinc-600">
