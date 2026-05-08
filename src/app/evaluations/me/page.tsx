@@ -131,9 +131,9 @@ export default async function MyEvalPage() {
   if (!myEvals || myEvals.length === 0) {
     return (
       <PageShell title="本月評核" subtitle={`${year} 年 ${month} 月`}>
-        <div className="rounded-xl border border-red-200 bg-white/80 p-6 text-center dark:border-red-900/40 dark:bg-zinc-900/60">
+        <div className="rounded-xl border border-zinc-200 bg-white/80 p-6 text-center dark:border-zinc-800 dark:bg-zinc-900/60">
           <p className="text-zinc-600 dark:text-zinc-400">
-            找不到你的評核紀錄。請聯絡秘書確認。
+            本月你沒有要填的評核。
           </p>
         </div>
       </PageShell>

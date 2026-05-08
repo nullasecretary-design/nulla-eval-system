@@ -135,9 +135,6 @@ export default async function EmployeeQuarterDetailPage({
                 <th className="pb-2 px-2 text-right font-medium text-emerald-700 dark:text-emerald-300">
                   加權結果
                 </th>
-                {hasManager && (
-                  <th className="pb-2 pl-2 text-right font-medium">主/執行長落差</th>
-                )}
               </tr>
             </thead>
             <tbody>
@@ -186,11 +183,6 @@ function MonthRow({ m, hasManager }: { m: MonthData; hasManager: boolean }) {
   const selfTotal = m.selfTotal;
   const mgrTotal = totalOf(m.evals.mgr);
   const ceoTotal = totalOf(m.evals.ceo);
-  const gap =
-    mgrTotal !== null && ceoTotal !== null
-      ? Math.abs(mgrTotal - ceoTotal)
-      : null;
-  const gapAlert = gap !== null && gap >= 10;
 
   return (
     <tr className="border-b border-zinc-100 dark:border-zinc-900">
@@ -211,17 +203,6 @@ function MonthRow({ m, hasManager }: { m: MonthData; hasManager: boolean }) {
       <td className="py-2 px-2 text-right tabular-nums font-bold text-emerald-700 dark:text-emerald-300">
         {fmt(m.weightedTotal)}
       </td>
-      {hasManager && (
-        <td
-          className={`py-2 pl-2 text-right tabular-nums ${
-            gapAlert
-              ? 'rounded-md bg-amber-100 font-bold text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
-              : 'text-zinc-600 dark:text-zinc-400'
-          }`}
-        >
-          {fmt(gap)}
-        </td>
-      )}
     </tr>
   );
 }

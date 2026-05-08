@@ -146,11 +146,11 @@ export default async function Home() {
     cardATopLabel = `${year} 年 ${month} 月`;
     cardAMainLabel = cd.label;
     if (progress) {
-      if (emp.position === '一般員工') {
+      if (progress.total === 0) {
+        cardAProgress = '本月你沒有要填的評核';
+      } else if (emp.position === '一般員工') {
         cardAProgress =
-          progress.done >= progress.total && progress.total > 0
-            ? '✓ 已完成'
-            : '尚未填寫';
+          progress.done >= progress.total ? '✓ 已完成' : '尚未填寫';
       } else {
         cardAProgress = `已完成 ${progress.done}/${progress.total} 人`;
       }
@@ -265,27 +265,37 @@ export default async function Home() {
         </Link>
 
         {/* 後台入口 */}
-        {(isAdmin || canViewReports) && (
-          <div className="flex flex-col gap-2">
-            {isAdmin && (
-              <Link
-                href="/admin/evaluations"
-                className="block rounded-xl border border-zinc-200 bg-white/60 px-5 py-3 text-sm text-zinc-700 transition hover:bg-white dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-300 dark:hover:bg-zinc-900/80"
-              >
-                <span className="font-medium">後台:評核管理</span>
-                <span className="ml-2 text-xs text-zinc-500">看大家的進度、解鎖 →</span>
-              </Link>
-            )}
-            {canViewReports && (
-              <Link
-                href="/admin/reports"
-                className="block rounded-xl border border-zinc-200 bg-white/60 px-5 py-3 text-sm text-zinc-700 transition hover:bg-white dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-300 dark:hover:bg-zinc-900/80"
-              >
-                <span className="font-medium">後台:季度報表</span>
-                <span className="ml-2 text-xs text-zinc-500">看每季加權分數 →</span>
-              </Link>
-            )}
-          </div>
+        {isAdmin && (
+          <Link
+            href="/admin/evaluations"
+            className="block rounded-2xl border-2 border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur transition hover:bg-white hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900/60 dark:hover:bg-zinc-900/80"
+          >
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+              評核管理
+              <span className="ml-2 text-sm font-normal text-zinc-500 dark:text-zinc-400">
+                (秘書專用)
+              </span>
+            </h2>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              看大家的進度、解鎖
+            </p>
+          </Link>
+        )}
+        {canViewReports && (
+          <Link
+            href="/admin/reports"
+            className="block rounded-2xl border-2 border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur transition hover:bg-white hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900/60 dark:hover:bg-zinc-900/80"
+          >
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+              季度報表
+              <span className="ml-2 text-sm font-normal text-zinc-500 dark:text-zinc-400">
+                (會計專用)
+              </span>
+            </h2>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              看每季加權分數、下載 CSV
+            </p>
+          </Link>
         )}
 
         {/* Footer note */}
