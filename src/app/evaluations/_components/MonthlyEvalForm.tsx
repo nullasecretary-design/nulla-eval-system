@@ -18,6 +18,12 @@ export type SubordinateSelfView = {
   comment: string | null;
 };
 
+export type SubordinateManagerView = {
+  status: '待填' | '已填';
+  scores: Scores;
+  comment: string | null;
+};
+
 export type SubordinateProfile = {
   employee_number: string;
   name: string;
@@ -41,6 +47,16 @@ export type Section =
       comment: string;
       subordinate: SubordinateProfile;
       subordinateSelf: SubordinateSelfView;
+    }
+  | {
+      kind: 'executive';
+      evalId: string;
+      status: '待填' | '已填';
+      scores: Scores;
+      comment: string;
+      subordinate: SubordinateProfile;
+      subordinateSelf: SubordinateSelfView;
+      subordinateManager: SubordinateManagerView | null;
     };
 
 function totalScores(s: Scores): number {
@@ -51,6 +67,55 @@ function totalScores(s: Scores): number {
 // Scores grid (editable)
 // ---------------------------------------------------------------------------
 
+type Accent = 'blue' | 'purple' | 'green';
+
+const INPUT_STYLES: Record<Accent, {
+  card: string;
+  input: string;
+  track: string;
+  fill: string;
+}> = {
+  blue: {
+    card: 'border-blue-200 bg-blue-50/40 dark:border-blue-900/40 dark:bg-blue-950/20',
+    input:
+      'border-blue-300 text-blue-700 focus:border-blue-500 dark:border-blue-700 dark:text-blue-300',
+    track: 'bg-blue-100 dark:bg-blue-950',
+    fill: 'bg-blue-500 dark:bg-blue-400',
+  },
+  purple: {
+    card: 'border-purple-200 bg-purple-50/40 dark:border-purple-900/40 dark:bg-purple-950/20',
+    input:
+      'border-purple-300 text-purple-700 focus:border-purple-500 dark:border-purple-700 dark:text-purple-300',
+    track: 'bg-purple-100 dark:bg-purple-950',
+    fill: 'bg-purple-500 dark:bg-purple-400',
+  },
+  green: {
+    card: 'border-emerald-200 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20',
+    input:
+      'border-emerald-300 text-emerald-700 focus:border-emerald-500 dark:border-emerald-700 dark:text-emerald-300',
+    track: 'bg-emerald-100 dark:bg-emerald-950',
+    fill: 'bg-emerald-500 dark:bg-emerald-400',
+  },
+};
+
+const READOUT_STYLES: Record<Accent, { row: string; track: string; fill: string }> = {
+  blue: {
+    row: 'text-blue-700 dark:text-blue-300',
+    track: 'bg-blue-100 dark:bg-blue-950',
+    fill: 'bg-blue-500 dark:bg-blue-400',
+  },
+  purple: {
+    row: 'text-purple-700 dark:text-purple-300',
+    track: 'bg-purple-100 dark:bg-purple-950',
+    fill: 'bg-purple-500 dark:bg-purple-400',
+  },
+  green: {
+    row: 'text-emerald-700 dark:text-emerald-300',
+    track: 'bg-emerald-100 dark:bg-emerald-950',
+    fill: 'bg-emerald-500 dark:bg-emerald-400',
+  },
+};
+
 function ScoreInputs({
   scores,
   onChange,
@@ -58,24 +123,9 @@ function ScoreInputs({
 }: {
   scores: Scores;
   onChange: (key: ScoreKey, raw: string, max: number) => void;
-  accent: 'blue' | 'purple';
+  accent: Accent;
 }) {
-  const styles =
-    accent === 'blue'
-      ? {
-          card: 'border-blue-200 bg-blue-50/40 dark:border-blue-900/40 dark:bg-blue-950/20',
-          input:
-            'border-blue-300 text-blue-700 focus:border-blue-500 dark:border-blue-700 dark:text-blue-300',
-          track: 'bg-blue-100 dark:bg-blue-950',
-          fill: 'bg-blue-500 dark:bg-blue-400',
-        }
-      : {
-          card: 'border-purple-200 bg-purple-50/40 dark:border-purple-900/40 dark:bg-purple-950/20',
-          input:
-            'border-purple-300 text-purple-700 focus:border-purple-500 dark:border-purple-700 dark:text-purple-300',
-          track: 'bg-purple-100 dark:bg-purple-950',
-          fill: 'bg-purple-500 dark:bg-purple-400',
-        };
+  const styles = INPUT_STYLES[accent];
 
   return (
     <div className="space-y-3">
@@ -124,21 +174,10 @@ function ScoreReadout({
   compact,
 }: {
   scores: Scores;
-  accent: 'blue' | 'purple';
+  accent: Accent;
   compact?: boolean;
 }) {
-  const styles =
-    accent === 'blue'
-      ? {
-          row: 'text-blue-700 dark:text-blue-300',
-          track: 'bg-blue-100 dark:bg-blue-950',
-          fill: 'bg-blue-500 dark:bg-blue-400',
-        }
-      : {
-          row: 'text-purple-700 dark:text-purple-300',
-          track: 'bg-purple-100 dark:bg-purple-950',
-          fill: 'bg-purple-500 dark:bg-purple-400',
-        };
+  const styles = READOUT_STYLES[accent];
   const barH = compact ? 'h-1.5' : 'h-2';
 
   return (
@@ -369,6 +408,148 @@ function ManagerBlock({
 }
 
 // ---------------------------------------------------------------------------
+// Executive block
+// ---------------------------------------------------------------------------
+
+function PendingBox({ label }: { label: string }) {
+  return (
+    <div className="rounded-md border border-dashed border-zinc-300 bg-white/50 px-3 py-2 text-center text-xs text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400">
+      {label}
+    </div>
+  );
+}
+
+function ExecutiveBlock({
+  section,
+  onScore,
+  onComment,
+}: {
+  section: Extract<Section, { kind: 'executive' }>;
+  onScore: (key: ScoreKey, raw: string, max: number) => void;
+  onComment: (val: string) => void;
+}) {
+  const total = totalScores(section.scores);
+  const subSelf = section.subordinateSelf;
+  const subMgr = section.subordinateManager;
+  const subSelfTotal = totalScores(subSelf.scores);
+  const subMgrTotal = subMgr ? totalScores(subMgr.scores) : 0;
+  const submitted = section.status === '已填';
+
+  return (
+    <section
+      className={`rounded-2xl border-2 p-5 shadow-sm ${
+        submitted
+          ? 'border-emerald-300 bg-emerald-50/40 dark:border-emerald-900/50 dark:bg-emerald-950/20'
+          : 'border-emerald-200 bg-white/80 dark:border-emerald-900/40 dark:bg-zinc-900/60'
+      }`}
+    >
+      <header className="flex items-center justify-between border-b border-zinc-200 pb-3 dark:border-zinc-800">
+        <div>
+          <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+            {section.subordinate.name}
+          </h3>
+          <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+            {section.subordinate.department} · {section.subordinate.job_title}
+          </p>
+        </div>
+        {submitted && (
+          <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-medium text-white">
+            ✓ 已送出
+          </span>
+        )}
+      </header>
+
+      {/* 員工自評(唯讀) */}
+      <div className="mt-4">
+        <h4 className="mb-2 text-sm font-semibold text-blue-700 dark:text-blue-300">員工自評</h4>
+        {subSelf.status === '已填' ? (
+          <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-3 dark:border-blue-900/40 dark:bg-blue-950/20">
+            <ScoreReadout scores={subSelf.scores} accent="blue" compact />
+            <div className="mt-2 flex items-center justify-between border-t border-blue-200 pt-2 text-sm dark:border-blue-900/40">
+              <span className="text-zinc-600 dark:text-zinc-400">自評總計</span>
+              <span className="font-bold text-blue-700 dark:text-blue-300">{subSelfTotal} / 100</span>
+            </div>
+            {subSelf.comment && (
+              <div className="mt-2 rounded-md bg-white/70 px-3 py-2 text-sm text-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-300">
+                <span className="text-xs text-zinc-500">員工備註:</span> {subSelf.comment}
+              </div>
+            )}
+          </div>
+        ) : (
+          <PendingBox label="員工尚未填自評" />
+        )}
+      </div>
+
+      {/* 主管評(唯讀,直屬執行長者不顯示) */}
+      {subMgr && (
+        <div className="mt-4">
+          <h4 className="mb-2 text-sm font-semibold text-purple-700 dark:text-purple-300">主管評</h4>
+          {subMgr.status === '已填' ? (
+            <div className="rounded-xl border border-purple-200 bg-purple-50/40 p-3 dark:border-purple-900/40 dark:bg-purple-950/20">
+              <ScoreReadout scores={subMgr.scores} accent="purple" compact />
+              <div className="mt-2 flex items-center justify-between border-t border-purple-200 pt-2 text-sm dark:border-purple-900/40">
+                <span className="text-zinc-600 dark:text-zinc-400">主管總計</span>
+                <span className="font-bold text-purple-700 dark:text-purple-300">{subMgrTotal} / 100</span>
+              </div>
+              {subMgr.comment && (
+                <div className="mt-2 rounded-md bg-white/70 px-3 py-2 text-sm text-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-300">
+                  <span className="text-xs text-zinc-500">主管備註:</span> {subMgr.comment}
+                </div>
+              )}
+            </div>
+          ) : (
+            <PendingBox label="主管尚未評核" />
+          )}
+        </div>
+      )}
+
+      {/* 執行長評 */}
+      <div className="mt-5">
+        <h4 className="mb-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300">執行長評</h4>
+        {submitted ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+            <ScoreReadout scores={section.scores} accent="green" compact />
+            <div className="mt-2 flex items-center justify-between border-t border-emerald-200 pt-2 text-sm dark:border-emerald-900/40">
+              <span className="text-zinc-600 dark:text-zinc-400">執行長總計</span>
+              <span className="font-bold text-emerald-700 dark:text-emerald-300">{total} / 100</span>
+            </div>
+            {section.comment && (
+              <div className="mt-2 rounded-md bg-white/70 px-3 py-2 text-sm text-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-300">
+                <span className="text-xs text-zinc-500">執行長備註:</span> {section.comment}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <ScoreInputs scores={section.scores} onChange={onScore} accent="green" />
+
+            <div className="mt-4 rounded-xl bg-emerald-600 px-5 py-3 text-white shadow-md">
+              <div className="flex items-center justify-between">
+                <span className="text-sm uppercase tracking-wider opacity-80">執行長總計</span>
+                <span className="text-2xl font-bold">{total} / 100</span>
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                備註(選填)
+              </label>
+              <textarea
+                value={section.comment}
+                onChange={(e) => onComment(e.target.value)}
+                rows={2}
+                placeholder="本月有話要說"
+                className="mt-2 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              />
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main form
 // ---------------------------------------------------------------------------
 
@@ -432,7 +613,11 @@ export function MonthlyEvalForm({
         if (!res.ok) {
           const text = await res.text();
           const who =
-            s.kind === 'self' ? '你的自評' : `${s.subordinate.name} 的主管評`;
+            s.kind === 'self'
+              ? '你的自評'
+              : s.kind === 'manager'
+                ? `${s.subordinate.name} 的主管評`
+                : `${s.subordinate.name} 的執行長評`;
           setError(`「${who}」送出失敗:${text || '未知錯誤'}`);
           setSubmitting(false);
           setShowConfirm(false);
@@ -457,6 +642,7 @@ export function MonthlyEvalForm({
 
   const selfSections = sections.filter((s): s is Extract<Section, { kind: 'self' }> => s.kind === 'self');
   const mgrSections = sections.filter((s): s is Extract<Section, { kind: 'manager' }> => s.kind === 'manager');
+  const execSections = sections.filter((s): s is Extract<Section, { kind: 'executive' }> => s.kind === 'executive');
 
   return (
     <div className="flex flex-col gap-6">
@@ -488,6 +674,25 @@ export function MonthlyEvalForm({
           <div className="flex flex-col gap-5">
             {mgrSections.map((s) => (
               <ManagerBlock
+                key={s.evalId}
+                section={s}
+                onScore={(k, raw, max) => setScore(s.evalId, k, raw, max)}
+                onComment={(v) => setComment(s.evalId, v)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 執行長評核 */}
+      {execSections.length > 0 && (
+        <div>
+          <h2 className="mb-3 text-lg font-bold text-emerald-700 dark:text-emerald-300">
+            執行長評核({execSections.length} 人)
+          </h2>
+          <div className="flex flex-col gap-5">
+            {execSections.map((s) => (
+              <ExecutiveBlock
                 key={s.evalId}
                 section={s}
                 onScore={(k, raw, max) => setScore(s.evalId, k, raw, max)}
@@ -544,7 +749,12 @@ export function MonthlyEvalForm({
             <ul className="mt-3 space-y-1 rounded-md bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-800">
               {pending.map((s) => {
                 const t = totalScores(s.scores);
-                const who = s.kind === 'self' ? '自評' : `${s.subordinate.name}(主管評)`;
+                const who =
+                  s.kind === 'self'
+                    ? '自評'
+                    : s.kind === 'manager'
+                      ? `${s.subordinate.name}(主管評)`
+                      : `${s.subordinate.name}(執行長評)`;
                 return (
                   <li key={s.evalId} className="flex justify-between">
                     <span className="text-zinc-700 dark:text-zinc-300">{who}</span>

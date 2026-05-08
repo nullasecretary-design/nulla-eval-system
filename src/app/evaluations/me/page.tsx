@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import {
   MonthlyEvalForm,
   type Section,
+  type SubordinateManagerView,
   type SubordinateProfile,
   type SubordinateSelfView,
 } from '../_components/MonthlyEvalForm';
@@ -141,14 +142,19 @@ export default async function MyEvalPage() {
 
   const selfRows = (myEvals as EvalRow[]).filter((r) => r.evaluator_role === '自評');
   const mgrRows = (myEvals as EvalRow[]).filter((r) => r.evaluator_role === '主管');
+  const execRows = (myEvals as EvalRow[]).filter((r) => r.evaluator_role === '執行長');
 
-  // 抓下屬 profile + 下屬自評(只給 manager 用)
-  const subIds = mgrRows.map((r) => r.evaluatee_id);
+  // 抓下屬 profile + 下屬自評 + 下屬主管評
+  // 主管評卡片需要下屬自評;執行長評卡片需要下屬自評 + 下屬主管評(若有)
+  const subIds = Array.from(
+    new Set([...mgrRows.map((r) => r.evaluatee_id), ...execRows.map((r) => r.evaluatee_id)])
+  );
   const subProfiles: SubordinateProfile[] = [];
   const subSelfMap = new Map<string, SubordinateSelfView>();
+  const subMgrMap = new Map<string, SubordinateManagerView>();
 
   if (subIds.length > 0) {
-    const [{ data: profiles }, { data: subSelfs }] = await Promise.all([
+    const [{ data: profiles }, { data: subSelfs }, { data: subMgrs }] = await Promise.all([
       supabaseAdmin
         .from('employees')
         .select('employee_number, name, department, job_title')
@@ -161,6 +167,14 @@ export default async function MyEvalPage() {
         .eq('period_id', period.id)
         .in('evaluatee_id', subIds)
         .eq('evaluator_role', '自評'),
+      supabaseAdmin
+        .from('evaluations')
+        .select(
+          'evaluatee_id, status, score_efficiency, score_quality, score_cooperation, score_attendance, comment'
+        )
+        .eq('period_id', period.id)
+        .in('evaluatee_id', subIds)
+        .eq('evaluator_role', '主管'),
     ]);
     subProfiles.push(...((profiles ?? []) as SubordinateProfile[]));
     for (const s of subSelfs ?? []) {
@@ -168,6 +182,13 @@ export default async function MyEvalPage() {
         status: (s.status === '已填' ? '已填' : '待填') as Status,
         scores: rowToScores(s),
         comment: s.comment,
+      });
+    }
+    for (const m of subMgrs ?? []) {
+      subMgrMap.set(m.evaluatee_id, {
+        status: (m.status === '已填' ? '已填' : '待填') as Status,
+        scores: rowToScores(m),
+        comment: m.comment,
       });
     }
   }
@@ -202,6 +223,27 @@ export default async function MyEvalPage() {
       comment: r.comment ?? '',
       subordinate: profile,
       subordinateSelf: subSelf,
+    });
+  }
+
+  for (const r of execRows) {
+    const profile = profileMap.get(r.evaluatee_id);
+    if (!profile) continue;
+    const subSelf = subSelfMap.get(r.evaluatee_id) ?? {
+      status: '待填' as Status,
+      scores: { efficiency: 0, quality: 0, cooperation: 0, attendance: 0 },
+      comment: null,
+    };
+    const subMgr = subMgrMap.get(r.evaluatee_id) ?? null;
+    sections.push({
+      kind: 'executive',
+      evalId: r.id,
+      status: (r.status === '已填' ? '已填' : '待填') as Status,
+      scores: rowToScores(r),
+      comment: r.comment ?? '',
+      subordinate: profile,
+      subordinateSelf: subSelf,
+      subordinateManager: subMgr,
     });
   }
 
