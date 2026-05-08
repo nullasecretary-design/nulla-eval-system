@@ -163,6 +163,10 @@ export default async function Home() {
   const isAdmin =
     emp.admin_role === '秘書' || emp.admin_role === '超級管理員';
   const canActivate = isAdmin && !period;
+  const canViewReports =
+    emp.position === '執行長' ||
+    emp.admin_role === '超級管理員' ||
+    emp.admin_role === '會計';
 
   // 預設截止 = 本月最後一天 23:59
   const lastDay = new Date(year, month, 0).getDate();
@@ -260,15 +264,28 @@ export default async function Home() {
           </p>
         </Link>
 
-        {/* 秘書/超管專屬入口 */}
-        {isAdmin && (
-          <Link
-            href="/admin/evaluations"
-            className="block rounded-xl border border-zinc-200 bg-white/60 px-5 py-3 text-sm text-zinc-700 transition hover:bg-white dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-300 dark:hover:bg-zinc-900/80"
-          >
-            <span className="font-medium">後台:評核管理</span>
-            <span className="ml-2 text-xs text-zinc-500">看大家的進度、解鎖 →</span>
-          </Link>
+        {/* 後台入口 */}
+        {(isAdmin || canViewReports) && (
+          <div className="flex flex-col gap-2">
+            {isAdmin && (
+              <Link
+                href="/admin/evaluations"
+                className="block rounded-xl border border-zinc-200 bg-white/60 px-5 py-3 text-sm text-zinc-700 transition hover:bg-white dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-300 dark:hover:bg-zinc-900/80"
+              >
+                <span className="font-medium">後台:評核管理</span>
+                <span className="ml-2 text-xs text-zinc-500">看大家的進度、解鎖 →</span>
+              </Link>
+            )}
+            {canViewReports && (
+              <Link
+                href="/admin/reports"
+                className="block rounded-xl border border-zinc-200 bg-white/60 px-5 py-3 text-sm text-zinc-700 transition hover:bg-white dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-300 dark:hover:bg-zinc-900/80"
+              >
+                <span className="font-medium">後台:季度報表</span>
+                <span className="ml-2 text-xs text-zinc-500">看每季加權分數 →</span>
+              </Link>
+            )}
+          </div>
         )}
 
         {/* Footer note */}
