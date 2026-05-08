@@ -1,10 +1,15 @@
 export default function LoginPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-gradient-to-br from-zinc-50 to-zinc-200 px-6 text-center dark:from-zinc-900 dark:to-black">
-      <h1 className="text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-        Nulla 績效評核系統
-      </h1>
-      <p className="text-xl text-zinc-600 dark:text-zinc-400">
+      <div className="flex flex-col items-center gap-1">
+        <h1 className="text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+          Hello, Nulla
+        </h1>
+        <p className="text-xl text-zinc-600 dark:text-zinc-400">
+          績效評核系統
+        </p>
+      </div>
+      <p className="text-sm text-zinc-500 dark:text-zinc-500">
         請使用 LINE 登入
       </p>
 

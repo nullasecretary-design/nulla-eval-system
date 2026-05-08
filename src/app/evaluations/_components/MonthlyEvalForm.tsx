@@ -291,33 +291,6 @@ function ManagerBlock({
   const subSelf = section.subordinateSelf;
   const subSelfTotal = totalScores(subSelf.scores);
   const submitted = section.status === '已填';
-  const blocked = !submitted && subSelf.status === '待填';
-
-  // ------- 員工還沒自評,鎖住整張 -------
-  if (blocked) {
-    return (
-      <section className="rounded-2xl border-2 border-dashed border-zinc-300 bg-zinc-50/60 p-5 dark:border-zinc-700 dark:bg-zinc-900/30">
-        <header className="flex items-center justify-between border-b border-zinc-200 pb-3 dark:border-zinc-800">
-          <div>
-            <h3 className="text-xl font-bold text-zinc-700 dark:text-zinc-300">
-              {section.subordinate.name}
-            </h3>
-            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-              {section.subordinate.department} · {section.subordinate.job_title}
-            </p>
-          </div>
-          <span className="rounded-full bg-zinc-200 px-3 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-            🔒 暫不可填
-          </span>
-        </header>
-        <div className="mt-4 rounded-xl bg-white/60 px-4 py-5 text-center text-sm text-zinc-600 dark:bg-zinc-900/40 dark:text-zinc-400">
-          等 {section.subordinate.name} 填完自評,你才能評他。
-          <br />
-          <span className="text-xs text-zinc-500">(這張不會算進「送出本月評核」的件數)</span>
-        </div>
-      </section>
-    );
-  }
 
   return (
     <section
@@ -343,21 +316,25 @@ function ManagerBlock({
         )}
       </header>
 
-      {/* 員工自評唯讀 */}
+      {/* 員工自評(若已填顯示分數,未填顯示佔位) */}
       <div className="mt-4">
-        <h4 className="mb-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">員工自評</h4>
-        <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-3 dark:border-blue-900/40 dark:bg-blue-950/20">
-          <ScoreReadout scores={subSelf.scores} accent="blue" compact />
-          <div className="mt-2 flex items-center justify-between border-t border-blue-200 pt-2 text-sm dark:border-blue-900/40">
-            <span className="text-zinc-600 dark:text-zinc-400">自評總計</span>
-            <span className="font-bold text-blue-700 dark:text-blue-300">{subSelfTotal} / 100</span>
-          </div>
-          {subSelf.comment && (
-            <div className="mt-2 rounded-md bg-white/70 px-3 py-2 text-sm text-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-300">
-              <span className="text-xs text-zinc-500">員工備註:</span> {subSelf.comment}
+        <h4 className="mb-2 text-sm font-semibold text-blue-700 dark:text-blue-300">員工自評</h4>
+        {subSelf.status === '已填' ? (
+          <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-3 dark:border-blue-900/40 dark:bg-blue-950/20">
+            <ScoreReadout scores={subSelf.scores} accent="blue" compact />
+            <div className="mt-2 flex items-center justify-between border-t border-blue-200 pt-2 text-sm dark:border-blue-900/40">
+              <span className="text-zinc-600 dark:text-zinc-400">自評總計</span>
+              <span className="font-bold text-blue-700 dark:text-blue-300">{subSelfTotal} / 100</span>
             </div>
-          )}
-        </div>
+            {subSelf.comment && (
+              <div className="mt-2 rounded-md bg-white/70 px-3 py-2 text-sm text-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-300">
+                <span className="text-xs text-zinc-500">員工備註:</span> {subSelf.comment}
+              </div>
+            )}
+          </div>
+        ) : (
+          <PendingBox label="員工尚未填自評" />
+        )}
       </div>
 
       {/* 主管評 */}
@@ -376,6 +353,9 @@ function ManagerBlock({
                 <span className="text-xs text-zinc-500">主管備註:</span> {section.comment}
               </div>
             )}
+            <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-500">
+              本月已評分。需要修改請聯絡秘書解鎖。
+            </p>
           </div>
         ) : (
           <>
@@ -518,6 +498,9 @@ function ExecutiveBlock({
                 <span className="text-xs text-zinc-500">執行長備註:</span> {section.comment}
               </div>
             )}
+            <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-500">
+              本月已評分。需要修改請聯絡秘書解鎖。
+            </p>
           </div>
         ) : (
           <>
@@ -563,17 +546,19 @@ export function MonthlyEvalForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function isBlocked(s: Section): boolean {
+  function isFilled(s: Section): boolean {
+    if (s.comment.trim().length > 0) return true;
     return (
-      s.kind === 'manager' &&
-      s.status === '待填' &&
-      s.subordinateSelf.status === '待填'
+      s.scores.efficiency > 0 ||
+      s.scores.quality > 0 ||
+      s.scores.cooperation > 0 ||
+      s.scores.attendance > 0
     );
   }
 
-  const pending = sections.filter((s) => s.status === '待填' && !isBlocked(s));
-  const blocked = sections.filter(isBlocked);
-  const allDone = pending.length === 0;
+  const ready = sections.filter((s) => s.status === '待填' && isFilled(s));
+  const skipped = sections.filter((s) => s.status === '待填' && !isFilled(s));
+  const allDone = ready.length === 0 && skipped.length === 0;
 
   function setScore(evalId: string, key: ScoreKey, raw: string, max: number) {
     let next: number;
@@ -603,7 +588,7 @@ export function MonthlyEvalForm({
     setSubmitting(true);
     setError(null);
 
-    for (const s of pending) {
+    for (const s of ready) {
       try {
         const res = await fetch(`/api/evaluations/${s.evalId}/submit`, {
           method: 'POST',
@@ -704,7 +689,7 @@ export function MonthlyEvalForm({
       )}
 
       {/* 送出 */}
-      {!allDone ? (
+      {ready.length > 0 ? (
         <>
           <button
             type="button"
@@ -712,7 +697,12 @@ export function MonthlyEvalForm({
             disabled={submitting}
             className="mt-2 rounded-lg bg-zinc-900 px-6 py-4 text-lg font-semibold text-white shadow-md transition hover:bg-zinc-800 active:bg-black disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
-            送出本月評核({pending.length} 件待送)
+            送出本月評核({ready.length} 件已填)
+            {skipped.length > 0 && (
+              <span className="ml-2 text-sm font-normal opacity-80">
+                · {skipped.length} 件未填會留待下次
+              </span>
+            )}
           </button>
           {error && (
             <p className="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
@@ -720,9 +710,9 @@ export function MonthlyEvalForm({
             </p>
           )}
         </>
-      ) : blocked.length > 0 ? (
-        <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-center font-medium text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
-          ✓ 你能送的都送出了。還有 {blocked.length} 位下屬等他們先填自評。
+      ) : skipped.length > 0 ? (
+        <div className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-center font-medium text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/30 dark:text-zinc-300">
+          還有 {skipped.length} 件待填,填好分數或備註再按送出。
         </div>
       ) : (
         <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center font-medium text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
@@ -744,10 +734,10 @@ export function MonthlyEvalForm({
               ⚠️ 確認送出
             </h3>
             <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-              送出後將無法修改。確定要一次送出 {pending.length} 件評核嗎?
+              送出後將無法修改。確定要一次送出 {ready.length} 件評核嗎?
             </p>
             <ul className="mt-3 space-y-1 rounded-md bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-800">
-              {pending.map((s) => {
+              {ready.map((s) => {
                 const t = totalScores(s.scores);
                 const who =
                   s.kind === 'self'
