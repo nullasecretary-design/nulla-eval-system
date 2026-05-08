@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { ActivationForm } from './_components/ActivationForm';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -158,15 +159,35 @@ export default async function Home() {
 
   const aStyle = tierStyles[cardATier];
 
+  // 秘書 / 超管 + 本月還沒 period → 顯示啟動表單(取代 Card A)
+  const isAdmin =
+    emp.admin_role === '秘書' || emp.admin_role === '超級管理員';
+  const canActivate = isAdmin && !period;
+
+  // 預設截止 = 本月最後一天 23:59
+  const lastDay = new Date(year, month, 0).getDate();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const defaultDeadline = `${year}-${pad(month)}-${pad(lastDay)}T23:59`;
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-sky-50 to-zinc-100 dark:from-zinc-900 dark:to-black">
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-10">
-        {/* Header */}
-        <header className="flex items-start justify-between">
+        {/* Brand */}
+        <div className="text-center">
+          <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Hello, Nulla
+          </h1>
+          <p className="mt-1 text-base text-zinc-600 dark:text-zinc-400">
+            績效評核系統
+          </p>
+        </div>
+
+        {/* User info */}
+        <header className="flex items-start justify-between border-t border-zinc-200 pt-4 dark:border-zinc-800">
           <div className="text-left">
-            <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+            <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
               {emp.name}
-            </h1>
+            </h2>
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
               {emp.department} · {emp.job_title}
               {emp.admin_role && emp.admin_role !== '無' && (
@@ -186,32 +207,38 @@ export default async function Home() {
           </form>
         </header>
 
-        {/* Card A: 本月評核 */}
-        <Link
-          href="/evaluations/me"
-          className={`block rounded-2xl border-2 ${aStyle.ring} bg-white/80 p-6 shadow-sm backdrop-blur transition hover:shadow-md hover:bg-white dark:bg-zinc-900/60 dark:hover:bg-zinc-900/80`}
-        >
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-              本月評核
-            </h2>
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-medium ${aStyle.chip}`}
-            >
-              {cardATopLabel}
-            </span>
-          </div>
-          <p
-            className={`mt-4 text-2xl font-bold ${aStyle.text}`}
+        {/* Card A: 本月評核 — 秘書/超管在沒 period 時看到啟動表單 */}
+        {canActivate ? (
+          <ActivationForm
+            initialDeadlineLocal={defaultDeadline}
+            year={year}
+            month={month}
+          />
+        ) : (
+          <Link
+            href="/evaluations/me"
+            className={`block rounded-2xl border-2 ${aStyle.ring} bg-white/80 p-6 shadow-sm backdrop-blur transition hover:shadow-md hover:bg-white dark:bg-zinc-900/60 dark:hover:bg-zinc-900/80`}
           >
-            {cardAMainLabel}
-          </p>
-          {cardAProgress && (
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              {cardAProgress}
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                本月評核
+              </h2>
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-medium ${aStyle.chip}`}
+              >
+                {cardATopLabel}
+              </span>
+            </div>
+            <p className={`mt-4 text-2xl font-bold ${aStyle.text}`}>
+              {cardAMainLabel}
             </p>
-          )}
-        </Link>
+            {cardAProgress && (
+              <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                {cardAProgress}
+              </p>
+            )}
+          </Link>
+        )}
 
         {/* Card B: 歷史紀錄 */}
         <Link
