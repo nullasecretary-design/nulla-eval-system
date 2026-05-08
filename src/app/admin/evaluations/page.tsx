@@ -1,0 +1,267 @@
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { getSession } from '@/lib/session';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import { CompletedSection } from './_components/CompletedSection';
+
+type Role = '自評' | '主管' | '執行長';
+type Status = '待填' | '已填' | '已解鎖' | '逾期未填' | '作廢';
+
+type EvalRow = {
+  id: string;
+  evaluator_role: Role;
+  evaluator_id: string;
+  evaluatee_id: string;
+  status: Status;
+  filled_at: string | null;
+  last_modified_at: string | null;
+  unlocked_at: string | null;
+};
+
+const ROLES: Role[] = ['自評', '主管', '執行長'];
+
+const ROLE_STYLE: Record<Role, { tag: string; chip: string; ring: string }> = {
+  自評: {
+    tag: 'text-blue-700 dark:text-blue-300',
+    chip: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+    ring: 'border-blue-200 dark:border-blue-900/40',
+  },
+  主管: {
+    tag: 'text-purple-700 dark:text-purple-300',
+    chip: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+    ring: 'border-purple-200 dark:border-purple-900/40',
+  },
+  執行長: {
+    tag: 'text-emerald-700 dark:text-emerald-300',
+    chip: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+    ring: 'border-emerald-200 dark:border-emerald-900/40',
+  },
+};
+
+function formatDateTime(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const da = String(d.getDate()).padStart(2, '0');
+  const h = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  return `${y}/${mo}/${da} ${h}:${mi}`;
+}
+
+export default async function AdminEvaluationsPage() {
+  const session = await getSession();
+  if (!session) redirect('/login');
+
+  const { data: actor } = await supabaseAdmin
+    .from('employees')
+    .select('employee_number, name, org_id, admin_role, status')
+    .eq('employee_number', session.employee_number)
+    .single();
+  if (!actor) redirect('/login');
+  if (actor.status !== '在職') redirect('/');
+  if (actor.admin_role !== '秘書' && actor.admin_role !== '超級管理員') {
+    redirect('/');
+  }
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+
+  const { data: period } = await supabaseAdmin
+    .from('evaluation_periods')
+    .select('id, status, deadline_at')
+    .eq('org_id', actor.org_id)
+    .eq('year', year)
+    .eq('month', month)
+    .maybeSingle();
+
+  if (!period) {
+    return (
+      <Shell title="評核管理" subtitle={`${year} 年 ${month} 月`}>
+        <div className="rounded-xl border border-zinc-200 bg-white/80 p-6 text-center dark:border-zinc-800 dark:bg-zinc-900/60">
+          <p className="text-zinc-600 dark:text-zinc-400">本月評核尚未啟動。</p>
+          <Link
+            href="/"
+            className="mt-3 inline-block text-sm font-medium text-sky-700 hover:text-sky-900 dark:text-sky-300"
+          >
+            回首頁啟動 →
+          </Link>
+        </div>
+      </Shell>
+    );
+  }
+
+  const { data: rows } = await supabaseAdmin
+    .from('evaluations')
+    .select(
+      'id, evaluator_role, evaluator_id, evaluatee_id, status, filled_at, last_modified_at, unlocked_at'
+    )
+    .eq('period_id', period.id)
+    .returns<EvalRow[]>();
+
+  const evals: EvalRow[] = rows ?? [];
+
+  // 抓所有相關員工的姓名
+  const ids = Array.from(
+    new Set(evals.flatMap((r) => [r.evaluator_id, r.evaluatee_id]))
+  );
+  const { data: emps } = await supabaseAdmin
+    .from('employees')
+    .select('employee_number, name')
+    .in('employee_number', ids);
+  const nameMap = new Map<string, string>(
+    (emps ?? []).map((e) => [e.employee_number, e.name])
+  );
+  const nameOf = (id: string) => nameMap.get(id) ?? id;
+
+  // 進度卡:每個 role 的 X/Y
+  const progress = ROLES.map((role) => {
+    const roleRows = evals.filter((r) => r.evaluator_role === role);
+    const done = roleRows.filter((r) => r.status === '已填').length;
+    return { role, done, total: roleRows.length };
+  });
+
+  // 未完成(待填 / 已解鎖 / 逾期未填)
+  const pendingRows = evals
+    .filter(
+      (r) =>
+        r.status === '待填' ||
+        r.status === '已解鎖' ||
+        r.status === '逾期未填'
+    )
+    .sort((a, b) =>
+      a.evaluator_role === b.evaluator_role
+        ? a.evaluatee_id.localeCompare(b.evaluatee_id)
+        : ROLES.indexOf(a.evaluator_role) - ROLES.indexOf(b.evaluator_role)
+    );
+
+  // 已完成
+  const doneRows = evals
+    .filter((r) => r.status === '已填')
+    .sort((a, b) =>
+      (b.filled_at ?? '').localeCompare(a.filled_at ?? '')
+    );
+
+  return (
+    <Shell
+      title="評核管理"
+      subtitle={`${year} 年 ${month} 月 · ${
+        period.status === '進行中' ? '進行中' : period.status
+      } · 截止 ${formatDateTime(period.deadline_at)}`}
+    >
+      {/* 三張進度卡 */}
+      <div className="grid grid-cols-3 gap-3">
+        {progress.map((p) => {
+          const s = ROLE_STYLE[p.role];
+          const allDone = p.total > 0 && p.done === p.total;
+          return (
+            <div
+              key={p.role}
+              className={`rounded-xl border-2 ${s.ring} bg-white/80 p-4 text-center shadow-sm dark:bg-zinc-900/60`}
+            >
+              <div className={`text-xs font-medium ${s.tag}`}>{p.role}</div>
+              <div className="mt-1 text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                {p.done}
+                <span className="text-base text-zinc-500"> / {p.total}</span>
+              </div>
+              {allDone && (
+                <div className="mt-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                  ✓ 全完成
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 未完成名單 */}
+      <section className="rounded-2xl border border-zinc-200 bg-white/80 p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
+        <h2 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">
+          未完成({pendingRows.length} 件)
+        </h2>
+        {pendingRows.length === 0 ? (
+          <p className="rounded-md bg-emerald-50 px-3 py-3 text-center text-sm text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+            ✓ 本月所有評核都完成了
+          </p>
+        ) : (
+          <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+            {pendingRows.map((r) => {
+              const s = ROLE_STYLE[r.evaluator_role];
+              return (
+                <li
+                  key={r.id}
+                  className="flex items-center justify-between gap-3 py-2.5"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${s.chip}`}>
+                        {r.evaluator_role}
+                      </span>
+                      <span className="truncate font-medium text-zinc-900 dark:text-zinc-100">
+                        {nameOf(r.evaluatee_id)}
+                      </span>
+                      {r.status === '已解鎖' && (
+                        <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                          已解鎖待重填
+                        </span>
+                      )}
+                    </div>
+                    {r.evaluator_role !== '自評' && (
+                      <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                        評核人:{nameOf(r.evaluator_id)}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* 已完成名單(預設收合) */}
+      <CompletedSection
+        rows={doneRows.map((r) => ({
+          id: r.id,
+          role: r.evaluator_role,
+          evaluatee: nameOf(r.evaluatee_id),
+          evaluator: nameOf(r.evaluator_id),
+          filledAt: formatDateTime(r.filled_at),
+        }))}
+      />
+    </Shell>
+  );
+}
+
+function Shell({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-sky-50 to-zinc-100 dark:from-zinc-900 dark:to-black">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-6 py-10">
+        <header>
+          <Link
+            href="/"
+            className="text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+          >
+            ← 回首頁
+          </Link>
+          <h1 className="mt-2 text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+            {title}
+          </h1>
+          {subtitle && (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">{subtitle}</p>
+          )}
+        </header>
+        {children}
+      </div>
+    </main>
+  );
+}

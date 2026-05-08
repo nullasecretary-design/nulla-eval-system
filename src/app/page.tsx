@@ -260,6 +260,17 @@ export default async function Home() {
           </p>
         </Link>
 
+        {/* 秘書/超管專屬入口 */}
+        {isAdmin && (
+          <Link
+            href="/admin/evaluations"
+            className="block rounded-xl border border-zinc-200 bg-white/60 px-5 py-3 text-sm text-zinc-700 transition hover:bg-white dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-300 dark:hover:bg-zinc-900/80"
+          >
+            <span className="font-medium">後台:評核管理</span>
+            <span className="ml-2 text-xs text-zinc-500">看大家的進度、解鎖 →</span>
+          </Link>
+        )}
+
         {/* Footer note */}
         <p className="mt-2 text-center text-xs text-zinc-400 dark:text-zinc-600">
           員工編號 {emp.employee_number}

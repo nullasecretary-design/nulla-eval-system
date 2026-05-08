@@ -71,24 +71,28 @@ export async function POST(
     return bad('你不是這筆評核的填寫人', 403);
   }
 
-  if (evalRow.status !== '待填') {
+  if (evalRow.status !== '待填' && evalRow.status !== '已解鎖') {
     return bad(`這筆評核狀態是「${evalRow.status}」,不能填寫`, 409);
   }
 
+  const isRefill = evalRow.status === '已解鎖';
+  const statusBefore = evalRow.status as '待填' | '已解鎖';
   const now = new Date().toISOString();
+
+  const update: Record<string, unknown> = {
+    score_efficiency: validated.efficiency,
+    score_quality: validated.quality,
+    score_cooperation: validated.cooperation,
+    score_attendance: validated.attendance,
+    comment: trimmedComment,
+    status: '已填',
+    last_modified_at: now,
+  };
+  if (!isRefill) update.filled_at = now;
 
   const { error: updateErr } = await supabaseAdmin
     .from('evaluations')
-    .update({
-      score_efficiency: validated.efficiency,
-      score_quality: validated.quality,
-      score_cooperation: validated.cooperation,
-      score_attendance: validated.attendance,
-      comment: trimmedComment,
-      status: '已填',
-      filled_at: now,
-      last_modified_at: now,
-    })
+    .update(update)
     .eq('id', id);
 
   if (updateErr) return bad('儲存失敗:' + updateErr.message, 500);
@@ -98,13 +102,13 @@ export async function POST(
     .from('evaluation_logs')
     .insert({
       evaluation_id: id,
-      action_type: 'FILL',
+      action_type: isRefill ? 'REFILL' : 'FILL',
       actor_id: session.employee_number,
       score_efficiency_after: validated.efficiency,
       score_quality_after: validated.quality,
       score_cooperation_after: validated.cooperation,
       score_attendance_after: validated.attendance,
-      status_before: '待填',
+      status_before: statusBefore,
       status_after: '已填',
     });
 
