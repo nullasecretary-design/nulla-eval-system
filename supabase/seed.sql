@@ -51,16 +51,17 @@ INSERT INTO employees (
     employee_number, name, org_id, department, job_title,
     position, admin_role, manager_id, hired_at, status
 ) VALUES
-    -- Becca 直屬下屬(2 人)
-    ('NULLA0003', '同事A(Becca 直屬,待補實名)',
-        (SELECT id FROM organizations WHERE code = 'NULLA'),
-        '行銷部', '行銷專員', '一般員工', '無', 'NULLA0011',
-        '2021-04-01', '在職'),
-
+    -- Becca 直屬下屬(2 人):NULLA0008, NULLA0012
     ('NULLA0008', '同事B(Becca 直屬,待補實名)',
         (SELECT id FROM organizations WHERE code = 'NULLA'),
         '行銷部', '行銷專員', '一般員工', '無', 'NULLA0011',
         '2023-01-15', '在職'),
+
+    -- 直屬老闆(老闆直屬同事:NULLA0003, NULLA0013, NULLA0016)
+    ('NULLA0003', '同事A(老闆直屬,待補實名)',
+        (SELECT id FROM organizations WHERE code = 'NULLA'),
+        '行銷部', '行銷專員', '一般員工', '無', 'NULLA0001',
+        '2021-04-01', '在職'),
 
     -- 小嫚:會計,行政上掛 NULLA 但 NULLA 評核不產生她的單子
     -- (她實際職務在老闆診所,日後會搬到 CLINIC1/CLINIC2 org 之下)
@@ -69,10 +70,9 @@ INSERT INTO employees (
         '財務部', '會計', '一般員工', '會計', 'NULLA0001',
         '2020-06-01', '在職'),
 
-    -- 直屬老闆的同事(3 人)
-    ('NULLA0012', '同事C(老闆直屬,待補實名)',
+    ('NULLA0012', '同事C(Becca 直屬,待補實名)',
         (SELECT id FROM organizations WHERE code = 'NULLA'),
-        '行銷部', '行銷專員', '一般員工', '無', 'NULLA0001',
+        '行銷部', '行銷專員', '一般員工', '無', 'NULLA0011',
         '2023-08-01', '在職'),
 
     ('NULLA0013', '同事D(老闆直屬,待補實名)',

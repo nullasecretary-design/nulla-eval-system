@@ -2,14 +2,12 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { SelfEvalForm } from '../_components/SelfEvalForm';
-
-const ITEMS = [
-  { key: 'score_efficiency', label: '工作時效', max: 30 },
-  { key: 'score_quality', label: '工作品質', max: 25 },
-  { key: 'score_cooperation', label: '工作配合度', max: 25 },
-  { key: 'score_attendance', label: '出勤狀況', max: 20 },
-] as const;
+import {
+  MonthlyEvalForm,
+  type Section,
+  type SubordinateProfile,
+  type SubordinateSelfView,
+} from '../_components/MonthlyEvalForm';
 
 function PageShell({
   title,
@@ -45,6 +43,34 @@ function PageShell({
   );
 }
 
+type Status = '待填' | '已填';
+
+type EvalRow = {
+  id: string;
+  evaluator_role: string;
+  evaluatee_id: string;
+  status: string;
+  score_efficiency: number | null;
+  score_quality: number | null;
+  score_cooperation: number | null;
+  score_attendance: number | null;
+  comment: string | null;
+};
+
+function rowToScores(r: {
+  score_efficiency: number | null;
+  score_quality: number | null;
+  score_cooperation: number | null;
+  score_attendance: number | null;
+}) {
+  return {
+    efficiency: r.score_efficiency ?? 0,
+    quality: r.score_quality ?? 0,
+    cooperation: r.score_cooperation ?? 0,
+    attendance: r.score_attendance ?? 0,
+  };
+}
+
 export default async function MyEvalPage() {
   const session = await getSession();
   if (!session) redirect('/login');
@@ -54,10 +80,8 @@ export default async function MyEvalPage() {
     .select('employee_number, name, department, job_title, org_id')
     .eq('employee_number', session.employee_number)
     .single();
-
   if (!emp) redirect('/login');
 
-  // Find current month evaluation period
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
@@ -72,7 +96,7 @@ export default async function MyEvalPage() {
 
   if (!period || period.status === '待啟動') {
     return (
-      <PageShell title="本月自評" subtitle={`${year} 年 ${month} 月`}>
+      <PageShell title="本月評核" subtitle={`${year} 年 ${month} 月`}>
         <div className="rounded-xl border border-sky-200 bg-white/80 p-6 text-center dark:border-sky-900/40 dark:bg-zinc-900/60">
           <p className="text-zinc-600 dark:text-zinc-400">
             本月評核尚未啟動,等待秘書按下「啟動本月評核」。
@@ -84,7 +108,7 @@ export default async function MyEvalPage() {
 
   if (period.status === '已截止') {
     return (
-      <PageShell title="本月自評" subtitle={`${year} 年 ${month} 月`}>
+      <PageShell title="本月評核" subtitle={`${year} 年 ${month} 月`}>
         <div className="rounded-xl border border-zinc-300 bg-white/80 p-6 text-center dark:border-zinc-700 dark:bg-zinc-900/60">
           <p className="text-zinc-600 dark:text-zinc-400">本月評核已截止。</p>
         </div>
@@ -92,116 +116,101 @@ export default async function MyEvalPage() {
     );
   }
 
-  // Find self-eval row
-  const { data: selfEval } = await supabaseAdmin
+  // 我這個月要做的所有評核(自評 + 主管評)
+  const { data: myEvals } = await supabaseAdmin
     .from('evaluations')
     .select(
-      'id, status, score_efficiency, score_quality, score_cooperation, score_attendance, comment, filled_at'
+      'id, evaluator_role, evaluatee_id, status, score_efficiency, score_quality, score_cooperation, score_attendance, comment'
     )
     .eq('period_id', period.id)
-    .eq('evaluatee_id', emp.employee_number)
-    .eq('evaluator_role', '自評')
-    .maybeSingle();
+    .eq('evaluator_id', emp.employee_number)
+    .order('evaluator_role')
+    .order('evaluatee_id');
 
-  if (!selfEval) {
+  if (!myEvals || myEvals.length === 0) {
     return (
-      <PageShell title="本月自評" subtitle={`${year} 年 ${month} 月`}>
+      <PageShell title="本月評核" subtitle={`${year} 年 ${month} 月`}>
         <div className="rounded-xl border border-red-200 bg-white/80 p-6 text-center dark:border-red-900/40 dark:bg-zinc-900/60">
           <p className="text-zinc-600 dark:text-zinc-400">
-            找不到你的自評紀錄。請聯絡秘書確認。
+            找不到你的評核紀錄。請聯絡秘書確認。
           </p>
         </div>
       </PageShell>
     );
   }
 
-  if (selfEval.status === '已填') {
-    const total = ITEMS.reduce(
-      (sum, it) => sum + (selfEval[it.key] ?? 0),
-      0
-    );
-    return (
-      <PageShell
-        title={`${emp.name} - 自評`}
-        subtitle={`${emp.department} · ${emp.job_title} · ${year} 年 ${month} 月`}
-      >
-        <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4 text-sm text-blue-800 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-300">
-          ✓ 已完成,送出後不可修改
-        </div>
+  const selfRows = (myEvals as EvalRow[]).filter((r) => r.evaluator_role === '自評');
+  const mgrRows = (myEvals as EvalRow[]).filter((r) => r.evaluator_role === '主管');
 
-        {ITEMS.map((item) => {
-          const score = selfEval[item.key] ?? 0;
-          const pct = (score / item.max) * 100;
-          return (
-            <div
-              key={item.key}
-              className="rounded-xl border border-blue-200 bg-white/80 p-4 dark:border-blue-900/40 dark:bg-zinc-900/60"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-zinc-800 dark:text-zinc-100">
-                  {item.label}
-                </span>
-                <span className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                  {score} / {item.max}
-                </span>
-              </div>
-              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-blue-100 dark:bg-blue-950">
-                <div
-                  className="h-full rounded-full bg-blue-500 dark:bg-blue-400"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
+  // 抓下屬 profile + 下屬自評(只給 manager 用)
+  const subIds = mgrRows.map((r) => r.evaluatee_id);
+  const subProfiles: SubordinateProfile[] = [];
+  const subSelfMap = new Map<string, SubordinateSelfView>();
 
-        <div className="rounded-xl bg-blue-600 px-5 py-4 text-white shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="text-sm uppercase tracking-wider opacity-80">
-              總計
-            </span>
-            <span className="text-3xl font-bold">
-              {total} / 100
-            </span>
-          </div>
-        </div>
+  if (subIds.length > 0) {
+    const [{ data: profiles }, { data: subSelfs }] = await Promise.all([
+      supabaseAdmin
+        .from('employees')
+        .select('employee_number, name, department, job_title')
+        .in('employee_number', subIds),
+      supabaseAdmin
+        .from('evaluations')
+        .select(
+          'evaluatee_id, status, score_efficiency, score_quality, score_cooperation, score_attendance, comment'
+        )
+        .eq('period_id', period.id)
+        .in('evaluatee_id', subIds)
+        .eq('evaluator_role', '自評'),
+    ]);
+    subProfiles.push(...((profiles ?? []) as SubordinateProfile[]));
+    for (const s of subSelfs ?? []) {
+      subSelfMap.set(s.evaluatee_id, {
+        status: (s.status === '已填' ? '已填' : '待填') as Status,
+        scores: rowToScores(s),
+        comment: s.comment,
+      });
+    }
+  }
+  const profileMap = new Map(subProfiles.map((p) => [p.employee_number, p]));
 
-        {selfEval.comment && (
-          <div className="rounded-xl border border-zinc-200 bg-white/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              備註
-            </p>
-            <p className="mt-2 whitespace-pre-wrap text-zinc-800 dark:text-zinc-200">
-              {selfEval.comment}
-            </p>
-          </div>
-        )}
-      </PageShell>
-    );
+  // 拼出 sections array
+  const sections: Section[] = [];
+
+  for (const r of selfRows) {
+    sections.push({
+      kind: 'self',
+      evalId: r.id,
+      status: (r.status === '已填' ? '已填' : '待填') as Status,
+      scores: rowToScores(r),
+      comment: r.comment ?? '',
+    });
   }
 
-  if (selfEval.status !== '待填') {
-    return (
-      <PageShell title="本月自評" subtitle={`${year} 年 ${month} 月`}>
-        <div className="rounded-xl border border-zinc-300 bg-white/80 p-6 text-center dark:border-zinc-700 dark:bg-zinc-900/60">
-          <p className="text-zinc-600 dark:text-zinc-400">
-            這筆評核狀態是「{selfEval.status}」,目前無法填寫。
-          </p>
-        </div>
-      </PageShell>
-    );
+  for (const r of mgrRows) {
+    const profile = profileMap.get(r.evaluatee_id);
+    if (!profile) continue;
+    const subSelf = subSelfMap.get(r.evaluatee_id) ?? {
+      status: '待填' as Status,
+      scores: { efficiency: 0, quality: 0, cooperation: 0, attendance: 0 },
+      comment: null,
+    };
+    sections.push({
+      kind: 'manager',
+      evalId: r.id,
+      status: (r.status === '已填' ? '已填' : '待填') as Status,
+      scores: rowToScores(r),
+      comment: r.comment ?? '',
+      subordinate: profile,
+      subordinateSelf: subSelf,
+    });
   }
 
-  // status = '待填' — render the form
   return (
     <PageShell
-      title={`${emp.name} - 自評`}
-      subtitle={`${emp.department} · ${emp.job_title} · ${year} 年 ${month} 月`}
+      title="本月評核"
+      subtitle={`${emp.name} · ${emp.department} · ${emp.job_title} · ${year} 年 ${month} 月`}
     >
-      <SelfEvalForm
-        evalId={selfEval.id}
-        initialComment={selfEval.comment ?? ''}
-      />
+      <MonthlyEvalForm initialSections={sections} />
     </PageShell>
   );
 }

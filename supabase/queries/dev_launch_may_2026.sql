@@ -2,7 +2,7 @@
 -- DEV: Reset + 啟動 NULLA 2026 年 5 月 評核
 -- ============================================================================
 -- 跑這個 SQL 會做四件事:
---   1. 修正員工的主管關係(NULLA0003/0008 歸 Becca,其他直屬老闆)
+--   1. 修正員工的主管關係(NULLA0008/0012 歸 Becca,其他直屬老闆)
 --   2. 把小嫚 (NULLA0006) 的 admin_role 從超管改成會計、主管改成 CEO
 --   3. 清掉這個月任何已存在的評核 + log(可重跑)
 --   4. 重新建立本月評核期 + 14 張評核空白 row
@@ -40,12 +40,15 @@ BEGIN
     SET admin_role = '會計', manager_id = 'NULLA0001'
     WHERE employee_number = 'NULLA0006';
 
-    -- 3 個直屬老闆的同事:主管改成 CEO
+    -- Becca 的兩位下屬:NULLA0008, NULLA0012
+    UPDATE employees
+    SET manager_id = 'NULLA0011'
+    WHERE employee_number IN ('NULLA0008', 'NULLA0012');
+
+    -- 直屬老闆的同事:NULLA0003, NULLA0013, NULLA0016
     UPDATE employees
     SET manager_id = 'NULLA0001'
-    WHERE employee_number IN ('NULLA0012', 'NULLA0013', 'NULLA0016');
-
-    -- (NULLA0003, NULLA0008 維持 manager=NULLA0011,即 Becca 的兩位下屬)
+    WHERE employee_number IN ('NULLA0003', 'NULLA0013', 'NULLA0016');
 
 
     -- ------------------------------------------------------------------------
@@ -134,7 +137,7 @@ END $$;
 -- ============================================================================
 -- 預期看到:
 --   自評    | 6 | NULLA0003, NULLA0008, NULLA0011, NULLA0012, NULLA0013, NULLA0016
---   主管    | 2 | NULLA0003, NULLA0008
+--   主管    | 2 | NULLA0008, NULLA0012  ← Becca 的兩位下屬
 --   執行長  | 6 | NULLA0003, NULLA0008, NULLA0011, NULLA0012, NULLA0013, NULLA0016
 -- 合計 14 張
 -- ============================================================================
