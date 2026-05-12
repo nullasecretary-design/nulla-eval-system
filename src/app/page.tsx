@@ -281,6 +281,22 @@ export default async function Home() {
             </p>
           </Link>
         )}
+        {isAdmin && (
+          <Link
+            href="/admin/employees"
+            className="block rounded-2xl border-2 border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur transition hover:bg-white hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900/60 dark:hover:bg-zinc-900/80"
+          >
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+              員工管理
+              <span className="ml-2 text-sm font-normal text-zinc-500 dark:text-zinc-400">
+                (秘書專用)
+              </span>
+            </h2>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              新增、編輯、停用員工
+            </p>
+          </Link>
+        )}
         {canViewReports && (
           <Link
             href="/admin/reports"
