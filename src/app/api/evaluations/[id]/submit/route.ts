@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { buildSelfDoneNotice, sendEmail } from '@/lib/email';
+import { buildSelfDoneLine, pushLine } from '@/lib/line';
 
 const MAX = {
   efficiency: 30,
@@ -56,10 +58,10 @@ export async function POST(
   const trimmedComment =
     typeof comment === 'string' && comment.trim() ? comment.trim() : null;
 
-  // Look up evaluation row
+  // Look up evaluation row(連同要寄通知會用到的欄位)
   const { data: evalRow, error: lookupErr } = await supabaseAdmin
     .from('evaluations')
-    .select('id, evaluator_id, status')
+    .select('id, evaluator_id, evaluator_role, evaluatee_id, period_id, status')
     .eq('id', id)
     .maybeSingle();
 
@@ -117,5 +119,72 @@ export async function POST(
     console.error('evaluation_logs insert failed:', logErr.message);
   }
 
+  // ---- 自動通知:員工填完自評 → 寄信給主管(spec §3.4)----
+  // 失敗只 log,不影響送出成功。fire-and-forget。
+  if (evalRow.evaluator_role === '自評') {
+    notifyManagerAfterSelfEval({
+      evaluateeId: evalRow.evaluatee_id,
+      periodId: evalRow.period_id,
+    }).catch((e) => console.error('[notify] selfDone failed:', e));
+  }
+
   return NextResponse.json({ ok: true });
+}
+
+// ---------------------------------------------------------------------------
+// 通知 helper:員工填完自評後找該員工的主管 row,寄信給主管。
+// 沒主管(直屬執行長)或主管沒 email 都會被略過(只 log)。
+// ---------------------------------------------------------------------------
+async function notifyManagerAfterSelfEval(opts: {
+  evaluateeId: string;
+  periodId: string;
+}): Promise<void> {
+  // 找該員工這個月的 主管 評核 row,從 evaluator_id 拿到主管編號
+  const { data: mgrEval } = await supabaseAdmin
+    .from('evaluations')
+    .select('evaluator_id')
+    .eq('period_id', opts.periodId)
+    .eq('evaluatee_id', opts.evaluateeId)
+    .eq('evaluator_role', '主管')
+    .maybeSingle();
+  if (!mgrEval) return; // 直屬執行長者:沒主管,不寄
+
+  const { data: ee } = await supabaseAdmin
+    .from('employees')
+    .select('name')
+    .eq('employee_number', opts.evaluateeId)
+    .single();
+  if (!ee) return;
+
+  const { data: mgr } = await supabaseAdmin
+    .from('employees')
+    .select('company_email, line_user_id')
+    .eq('employee_number', mgrEval.evaluator_id)
+    .single();
+  if (!mgr) return;
+
+  const { data: period } = await supabaseAdmin
+    .from('evaluation_periods')
+    .select('year, month')
+    .eq('id', opts.periodId)
+    .single();
+  if (!period) return;
+
+  // 兩條 channel 同時發 — 任一個失敗都不影響另一條
+  if (mgr.company_email) {
+    const mail = buildSelfDoneNotice({
+      evaluateeName: ee.name,
+      year: period.year,
+      month: period.month,
+    });
+    await sendEmail({ to: mgr.company_email, ...mail });
+  }
+  if (mgr.line_user_id) {
+    const text = buildSelfDoneLine({
+      evaluateeName: ee.name,
+      year: period.year,
+      month: period.month,
+    });
+    await pushLine({ to: mgr.line_user_id, text });
+  }
 }

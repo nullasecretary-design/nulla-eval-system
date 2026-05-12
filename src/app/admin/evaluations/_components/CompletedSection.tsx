@@ -13,6 +13,7 @@ const CHIP: Record<Role, string> = {
 
 export function CompletedSection({
   rows,
+  canUnlock,
 }: {
   rows: {
     id: string;
@@ -21,6 +22,7 @@ export function CompletedSection({
     evaluator: string;
     filledAt: string;
   }[];
+  canUnlock: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -63,11 +65,13 @@ export function CompletedSection({
                       {r.filledAt}
                     </p>
                   </div>
-                  <UnlockButton
-                    evaluationId={r.id}
-                    evaluateeName={r.evaluatee}
-                    role={r.role}
-                  />
+                  {canUnlock && (
+                    <UnlockButton
+                      evaluationId={r.id}
+                      evaluateeName={r.evaluatee}
+                      role={r.role}
+                    />
+                  )}
                 </li>
               ))}
             </ul>

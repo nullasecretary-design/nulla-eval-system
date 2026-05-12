@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { ActivationForm } from './_components/ActivationForm';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -159,19 +158,18 @@ export default async function Home() {
 
   const aStyle = tierStyles[cardATier];
 
-  // 秘書 / 超管 + 本月還沒 period → 顯示啟動表單(取代 Card A)
   const isAdmin =
     emp.admin_role === '秘書' || emp.admin_role === '超級管理員';
-  const canActivate = isAdmin && !period;
   const canViewReports =
     emp.position === '執行長' ||
     emp.admin_role === '超級管理員' ||
     emp.admin_role === '會計';
+  // 規格 §10:執行長 也能看評核進度(自家)
+  const canViewEvalAdmin = isAdmin || emp.position === '執行長';
 
-  // 預設截止 = 本月最後一天 23:59
-  const lastDay = new Date(year, month, 0).getDate();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const defaultDeadline = `${year}-${pad(month)}-${pad(lastDay)}T23:59`;
+  // 本月還沒啟動的時候,Card A 退化成資訊卡(不可點),
+  // 啟動表單移到 /admin/evaluations 那邊去做
+  const notStarted = !period || period.status === '待啟動';
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-sky-50 to-zinc-100 dark:from-zinc-900 dark:to-black">
@@ -211,13 +209,39 @@ export default async function Home() {
           </form>
         </header>
 
-        {/* Card A: 本月評核 — 秘書/超管在沒 period 時看到啟動表單 */}
-        {canActivate ? (
-          <ActivationForm
-            initialDeadlineLocal={defaultDeadline}
-            year={year}
-            month={month}
-          />
+        {/* Card A: 本月評核 — 沒啟動時退化成資訊卡(不可點) */}
+        {notStarted ? (
+          <div
+            className={`block rounded-2xl border-2 ${aStyle.ring} bg-white/80 p-6 shadow-sm backdrop-blur dark:bg-zinc-900/60`}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                本月評核
+              </h2>
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-medium ${aStyle.chip}`}
+              >
+                {cardATopLabel}
+              </span>
+            </div>
+            <p className={`mt-4 text-2xl font-bold ${aStyle.text}`}>
+              {cardAMainLabel}
+            </p>
+            {isAdmin ? (
+              <Link
+                href="/admin/evaluations"
+                className="mt-3 inline-block text-sm font-medium text-sky-700 hover:text-sky-900 dark:text-sky-300"
+              >
+                去評核管理啟動 →
+              </Link>
+            ) : (
+              cardAProgress && (
+                <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                  {cardAProgress}
+                </p>
+              )
+            )}
+          </div>
         ) : (
           <Link
             href="/evaluations/me"
@@ -265,19 +289,23 @@ export default async function Home() {
         </Link>
 
         {/* 後台入口 */}
-        {isAdmin && (
+        {canViewEvalAdmin && (
           <Link
             href="/admin/evaluations"
             className="block rounded-2xl border-2 border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur transition hover:bg-white hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900/60 dark:hover:bg-zinc-900/80"
           >
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
               評核管理
-              <span className="ml-2 text-sm font-normal text-zinc-500 dark:text-zinc-400">
-                (秘書專用)
-              </span>
+              {isAdmin && (
+                <span className="ml-2 text-sm font-normal text-zinc-500 dark:text-zinc-400">
+                  (秘書專用)
+                </span>
+              )}
             </h2>
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              看大家的進度、解鎖
+              {isAdmin
+                ? '啟動本月評核流程、看全公司評核進度、解鎖'
+                : '看全公司評核進度'}
             </p>
           </Link>
         )}

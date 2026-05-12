@@ -2,7 +2,9 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { ActivationForm } from '@/app/_components/ActivationForm';
 import { CompletedSection } from './_components/CompletedSection';
+import { RemindButton } from './_components/RemindButton';
 
 type Role = '自評' | '主管' | '執行長';
 type Status = '待填' | '已填' | '已解鎖' | '逾期未填' | '作廢';
@@ -55,14 +57,20 @@ export default async function AdminEvaluationsPage() {
 
   const { data: actor } = await supabaseAdmin
     .from('employees')
-    .select('employee_number, name, org_id, admin_role, status')
+    .select('employee_number, name, org_id, position, admin_role, status')
     .eq('employee_number', session.employee_number)
     .single();
   if (!actor) redirect('/login');
   if (actor.status !== '在職') redirect('/');
-  if (actor.admin_role !== '秘書' && actor.admin_role !== '超級管理員') {
-    redirect('/');
-  }
+  // 規格 §10:秘書 / 超管 / 執行長 都能看評核進度(自家)
+  const isEvalAdmin =
+    actor.admin_role === '秘書' ||
+    actor.admin_role === '超級管理員' ||
+    actor.position === '執行長';
+  if (!isEvalAdmin) redirect('/');
+  // 但「解鎖」只給秘書 + 超管,執行長 沒有(規格 §10)
+  const canUnlock =
+    actor.admin_role === '秘書' || actor.admin_role === '超級管理員';
 
   const now = new Date();
   const year = now.getFullYear();
@@ -77,17 +85,28 @@ export default async function AdminEvaluationsPage() {
     .maybeSingle();
 
   if (!period) {
+    // 預設截止 = 本月最後一天 23:59
+    const lastDay = new Date(year, month, 0).getDate();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const defaultDeadline = `${year}-${pad(month)}-${pad(lastDay)}T23:59`;
+
     return (
       <Shell title="評核管理" subtitle={`${year} 年 ${month} 月`}>
-        <div className="rounded-xl border border-zinc-200 bg-white/80 p-6 text-center dark:border-zinc-800 dark:bg-zinc-900/60">
-          <p className="text-zinc-600 dark:text-zinc-400">本月評核尚未啟動。</p>
-          <Link
-            href="/"
-            className="mt-3 inline-block text-sm font-medium text-sky-700 hover:text-sky-900 dark:text-sky-300"
-          >
-            回首頁啟動 →
-          </Link>
-        </div>
+        {canUnlock ? (
+          // 秘書 / 超管 → 直接顯示啟動表單
+          <ActivationForm
+            initialDeadlineLocal={defaultDeadline}
+            year={year}
+            month={month}
+          />
+        ) : (
+          // 執行長 → 沒啟動權限,只能等
+          <div className="rounded-xl border border-zinc-200 bg-white/80 p-6 text-center dark:border-zinc-800 dark:bg-zinc-900/60">
+            <p className="text-zinc-600 dark:text-zinc-400">
+              本月評核尚未啟動,等待秘書啟動。
+            </p>
+          </div>
+        )}
       </Shell>
     );
   }
@@ -177,9 +196,21 @@ export default async function AdminEvaluationsPage() {
 
       {/* 未完成名單 */}
       <section className="rounded-2xl border border-zinc-200 bg-white/80 p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
-        <h2 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">
-          未完成({pendingRows.length} 件)
-        </h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
+            未完成({pendingRows.length} 件)
+          </h2>
+          {canUnlock && pendingRows.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <RemindButton mode="non-ceo" label="一鍵催繳全員(不含執行長)" />
+              <RemindButton
+                mode="ceo-only"
+                label="提醒執行長"
+                className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300"
+              />
+            </div>
+          )}
+        </div>
         {pendingRows.length === 0 ? (
           <p className="rounded-md bg-emerald-50 px-3 py-3 text-center text-sm text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
             ✓ 本月所有評核都完成了
@@ -213,6 +244,14 @@ export default async function AdminEvaluationsPage() {
                       </p>
                     )}
                   </div>
+                  {canUnlock && (
+                    <RemindButton
+                      mode="one"
+                      evaluatorId={r.evaluator_id}
+                      label={`提醒 ${nameOf(r.evaluator_id)}`}
+                      className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] font-medium text-zinc-600 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400"
+                    />
+                  )}
                 </li>
               );
             })}
@@ -222,6 +261,7 @@ export default async function AdminEvaluationsPage() {
 
       {/* 已完成名單(預設收合) */}
       <CompletedSection
+        canUnlock={canUnlock}
         rows={doneRows.map((r) => ({
           id: r.id,
           role: r.evaluator_role,
@@ -230,6 +270,17 @@ export default async function AdminEvaluationsPage() {
           filledAt: formatDateTime(r.filled_at),
         }))}
       />
+
+      {canUnlock && (
+        <div className="text-right">
+          <Link
+            href="/admin/unlocks"
+            className="text-sm text-amber-700 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-200"
+          >
+            解鎖紀錄 →
+          </Link>
+        </div>
+      )}
     </Shell>
   );
 }

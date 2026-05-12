@@ -57,7 +57,7 @@ function WeightedHelp() {
   );
 }
 
-function MonthCard({ m }: { m: MonthSummary }) {
+function MonthCard({ m, basePath }: { m: MonthSummary; basePath: string }) {
   const empty = m.selfTotal === null && m.weightedTotal === null;
   return (
     <div
@@ -75,7 +75,7 @@ function MonthCard({ m }: { m: MonthSummary }) {
           <span className="text-xs text-zinc-400">無紀錄</span>
         ) : (
           <Link
-            href={`/history/${m.year}/${m.month}`}
+            href={`${basePath}/${m.year}/${m.month}`}
             className="text-xs font-medium text-sky-700 hover:text-sky-900 dark:text-sky-300 dark:hover:text-sky-200"
           >
             查看詳細 →
@@ -104,10 +104,12 @@ function QuarterCard({
   q,
   expanded,
   onToggle,
+  basePath,
 }: {
   q: QuarterSummary;
   expanded: boolean;
   onToggle: () => void;
+  basePath: string;
 }) {
   const monthRange = q.months.map((m) => `${m}月`).join('·');
   return (
@@ -147,7 +149,7 @@ function QuarterCard({
         <div className="border-t border-zinc-200 p-4 dark:border-zinc-800">
           <div className="grid grid-cols-3 gap-3">
             {q.monthData.map((m) => (
-              <MonthCard key={`${m.year}-${m.month}`} m={m} />
+              <MonthCard key={`${m.year}-${m.month}`} m={m} basePath={basePath} />
             ))}
           </div>
         </div>
@@ -156,7 +158,13 @@ function QuarterCard({
   );
 }
 
-export function HistoryTimeline({ quarters }: { quarters: QuarterSummary[] }) {
+export function HistoryTimeline({
+  quarters,
+  basePath = '/history',
+}: {
+  quarters: QuarterSummary[];
+  basePath?: string;
+}) {
   // 最新季度預設展開
   const [openKey, setOpenKey] = useState<string | null>(
     quarters.length > 0 ? `${quarters[0].year}-Q${quarters[0].quarter}` : null
@@ -176,6 +184,7 @@ export function HistoryTimeline({ quarters }: { quarters: QuarterSummary[] }) {
             q={q}
             expanded={openKey === key}
             onToggle={() => setOpenKey(openKey === key ? null : key)}
+            basePath={basePath}
           />
         );
       })}

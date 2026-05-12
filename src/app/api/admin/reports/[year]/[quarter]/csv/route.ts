@@ -24,6 +24,20 @@ function fmtNum(n: number | null): string {
   return n === null ? '—' : n.toFixed(1);
 }
 
+// Asia/Taipei = UTC+8(台灣沒有夏令時間,固定偏移)
+function nowInTaipei(): { display: string; filename: string } {
+  const tw = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  const y = tw.getUTCFullYear();
+  const m = String(tw.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(tw.getUTCDate()).padStart(2, '0');
+  const hh = String(tw.getUTCHours()).padStart(2, '0');
+  const mi = String(tw.getUTCMinutes()).padStart(2, '0');
+  return {
+    display: `${y}/${m}/${d} ${hh}:${mi}`,
+    filename: `${y}${m}${d}_${hh}${mi}`,
+  };
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ year: string; quarter: string }> }
@@ -79,7 +93,14 @@ export async function GET(
     '是否缺評',
   ];
 
+  const now = nowInTaipei();
+
   const lines: string[] = [];
+  // 開頭幾筆 metadata,讓使用者光看檔頭就知道資料是何時下載的
+  lines.push(['下載時間', now.display].map(csvCell).join(','));
+  lines.push(['季度', `${year} Q${quarter}`].map(csvCell).join(','));
+  lines.push(['公司', org?.name ?? '—'].map(csvCell).join(','));
+  lines.push(''); // 空白列分隔
   lines.push(header.map(csvCell).join(','));
 
   for (const r of data.rows) {
@@ -120,7 +141,7 @@ export async function GET(
 
   // BOM 讓 Excel 開繁中不亂碼
   const csv = '﻿' + lines.join('\r\n') + '\r\n';
-  const filename = `${org?.code ?? 'ORG'}_${year}_Q${quarter}_report.csv`;
+  const filename = `${org?.code ?? 'ORG'}_${year}_Q${quarter}_report_${now.filename}.csv`;
 
   return new NextResponse(csv, {
     status: 200,

@@ -93,12 +93,20 @@ export default async function AdminEmployeesPage() {
               共 {rows.length} 人
             </p>
           </div>
-          <Link
-            href="/admin/employees/new"
-            className="rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
-          >
-            + 新增員工
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/admin/employees/import"
+              className="rounded-lg border border-sky-300 bg-sky-50 px-3 py-2.5 text-sm font-medium text-sky-700 transition hover:bg-sky-100 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-300"
+            >
+              ⬇ Excel 匯入
+            </Link>
+            <Link
+              href="/admin/employees/new"
+              className="rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
+            >
+              + 新增員工
+            </Link>
+          </div>
         </header>
 
         <EmployeeListClient rows={rows} showAdminRole={isSuperAdmin} />
