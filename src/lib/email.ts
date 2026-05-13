@@ -157,6 +157,33 @@ export function buildUnlockAuditNotice(opts: {
 }
 
 /**
+ * 後台動作審計通知:管理者身分變更(spec §9.1,Becca 2026-05-13 加實作)。
+ * 寄給所有超管。建立員工時 before = '(新建立)'。
+ */
+export function buildAdminRoleChangeNotice(opts: {
+  actorName: string;
+  targetName: string;
+  targetEmpNum: string;
+  before: string;
+  after: string;
+}): { subject: string; html: string; text: string } {
+  const { actorName, targetName, targetEmpNum, before, after } = opts;
+  const subject = `[NULLA] 管理者身分變更:${targetName} ${before} → ${after}`;
+  const html = shell(`
+    <h2 style="margin:0 0 12px;font-size:18px;color:#18181b;">管理者身分變更紀錄</h2>
+    <p style="margin:0 0 8px;">${actorName} 剛剛變更了一位員工的管理者身分:</p>
+    <ul style="margin:0 0 16px;padding-left:20px;color:#3f3f46;">
+      <li>對象:<strong>${targetName}</strong>(${targetEmpNum})</li>
+      <li>變更前:${before}</li>
+      <li>變更後:<strong>${after}</strong></li>
+    </ul>
+    <p style="margin:0;font-size:12px;color:#71717a;">這封信是動作備份,所有超管都會收到。可備查信箱搜尋「管理者身分變更」找歷史。</p>
+  `);
+  const text = `${actorName} 把 ${targetName}(${targetEmpNum})的管理者身分從「${before}」改成「${after}」。`;
+  return { subject, html, text };
+}
+
+/**
  * 後台動作審計通知:解除 LINE 綁定(Becca's add 2026-05-13)。
  */
 export function buildUnbindLineAuditNotice(opts: {

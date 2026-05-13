@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { notifyAdminRoleChange } from '@/lib/admin-role-audit';
 
 function bad(message: string, status = 400) {
   return new NextResponse(message, { status });
@@ -21,7 +22,7 @@ export async function PATCH(
 
   const { data: actor } = await supabaseAdmin
     .from('employees')
-    .select('employee_number, org_id, admin_role, status')
+    .select('employee_number, name, org_id, admin_role, status')
     .eq('employee_number', session.employee_number)
     .single();
   if (!actor) return bad('找不到使用者', 404);
@@ -32,7 +33,7 @@ export async function PATCH(
 
   const { data: target } = await supabaseAdmin
     .from('employees')
-    .select('employee_number, org_id')
+    .select('employee_number, name, org_id, admin_role')
     .eq('employee_number', employee_number)
     .maybeSingle();
   if (!target) return bad('找不到員工', 404);
@@ -101,6 +102,18 @@ export async function PATCH(
     .update(update)
     .eq('employee_number', employee_number);
   if (updateErr) return bad('儲存失敗:' + updateErr.message, 500);
+
+  // spec §9.1:管理者身分有變更時寄通知給所有超管
+  if (update.admin_role !== undefined && update.admin_role !== target.admin_role) {
+    await notifyAdminRoleChange({
+      actorName: actor.name,
+      orgId: target.org_id,
+      targetName: name, // PATCH 也可能改名,用送進來的新名
+      targetEmpNum: target.employee_number,
+      before: target.admin_role,
+      after: String(update.admin_role),
+    }).catch((e) => console.error('[employees PATCH] role change notify failed:', e));
+  }
 
   return NextResponse.json({ ok: true });
 }

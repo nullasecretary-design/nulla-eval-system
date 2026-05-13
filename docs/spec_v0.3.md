@@ -98,6 +98,11 @@ v0.2 相較於 v0.1 的主要更新:
   - `docs/移交清單.md` 給老闆 / 未來接手者的快速上手手冊(系統、帳號、例行操作、應急處理、未來開發 backlog)
   - `docs/移交清單.docx` Word 版(同內容)
   - `scripts/md-to-docx.mjs` 通用 md→docx 轉檔工具(用 `npm install --no-save docx marked` 跑),未來改 md 後可隨手重產 docx
+- ✅ **管理者身分變更通知**(規格 §9.1,Becca 2026-05-13 加實作)
+  - 觸發點:單筆新增員工(設了非「無」)/ 編輯員工改 admin_role / Excel 匯入帶 admin_role
+  - 收件人:**該 org 所有「超級管理員」**(Becca 從原規格「超管+會計」簡化成「只超管」)
+  - 內容:對象姓名 + 員工編號 + 變更前 → 變更後 + 變更者
+  - 沒做獨立 audit 資料庫表 — Becca 決定:email 留底就夠用,不寫表(YAGNI)
 - ⏳ Vercel 部署 — 下一步
 - ⏳ LINE 重綁(規格 §4.4)— 下一步
 

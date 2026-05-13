@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { notifyAdminRoleChange } from '@/lib/admin-role-audit';
 
 function bad(message: string, status = 400) {
   return new NextResponse(message, { status });
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
 
   const { data: actor } = await supabaseAdmin
     .from('employees')
-    .select('employee_number, org_id, admin_role, status')
+    .select('employee_number, name, org_id, admin_role, status')
     .eq('employee_number', session.employee_number)
     .single();
   if (!actor) return bad('找不到使用者', 404);
@@ -93,6 +94,18 @@ export async function POST(request: Request) {
     hired_at,
   });
   if (insertErr) return bad('建立失敗:' + insertErr.message, 500);
+
+  // spec §9.1:管理者身分有設(非「無」)時寄通知給所有超管
+  if (admin_role !== '無') {
+    await notifyAdminRoleChange({
+      actorName: actor.name,
+      orgId: actor.org_id,
+      targetName: name,
+      targetEmpNum: employee_number,
+      before: '(新建立)',
+      after: admin_role,
+    }).catch((e) => console.error('[employees POST] role change notify failed:', e));
+  }
 
   return NextResponse.json({ ok: true, employee_number });
 }

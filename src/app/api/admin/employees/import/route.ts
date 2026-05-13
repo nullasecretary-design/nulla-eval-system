@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { notifyAdminRoleChange } from '@/lib/admin-role-audit';
 
 // Excel 匯入不允許「執行長」「超級管理員」— 要建那種人請走單筆新增
 const POSITIONS_IMPORT = ['一般員工', '主管'] as const;
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
 
   const { data: actor } = await supabaseAdmin
     .from('employees')
-    .select('employee_number, org_id, admin_role, status')
+    .select('employee_number, name, org_id, admin_role, status')
     .eq('employee_number', session.employee_number)
     .single();
   if (!actor) return bad('找不到使用者', 404);
@@ -187,6 +188,21 @@ export async function POST(request: Request) {
   if (insertErr) {
     return bad('匯入失敗:' + insertErr.message, 500);
   }
+
+  // spec §9.1:批次匯入裡每個有設管理者身分(非「無」)的員工各寄一封通知給超管
+  const withRole = inserts.filter((i) => i.admin_role !== '無');
+  await Promise.allSettled(
+    withRole.map((i) =>
+      notifyAdminRoleChange({
+        actorName: actor.name,
+        orgId: actor.org_id,
+        targetName: i.name,
+        targetEmpNum: i.employee_number,
+        before: '(新建立)',
+        after: i.admin_role,
+      })
+    )
+  );
 
   return NextResponse.json({ ok: true, inserted: inserts.length });
 }
