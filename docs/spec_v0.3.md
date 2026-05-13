@@ -94,6 +94,10 @@ v0.2 相較於 v0.1 的主要更新:
   - 解除 LINE 綁定時:同上 pattern,信裡列出被解綁的對象
   - 不發 LINE(動作備份不需要即時推送,email 留底比較適合)
   - 失敗只 log,不擋主動作成功
+- ✅ **移交清單 + docx 轉檔 script**(2026-05-13)
+  - `docs/移交清單.md` 給老闆 / 未來接手者的快速上手手冊(系統、帳號、例行操作、應急處理、未來開發 backlog)
+  - `docs/移交清單.docx` Word 版(同內容)
+  - `scripts/md-to-docx.mjs` 通用 md→docx 轉檔工具(用 `npm install --no-save docx marked` 跑),未來改 md 後可隨手重產 docx
 - ⏳ Vercel 部署 — 下一步
 - ⏳ LINE 重綁(規格 §4.4)— 下一步
 
