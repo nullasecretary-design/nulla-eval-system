@@ -84,14 +84,19 @@ export default async function AdminEvaluationsPage() {
     .eq('month', month)
     .maybeSingle();
 
-  if (!period) {
+  // 沒 row(月初 cron 還沒跑)或已建檔但「待啟動」(月初 cron 已建)→ 都顯示啟動表單
+  if (!period || period.status === '待啟動') {
     // 預設截止 = 本月最後一天 23:59
     const lastDay = new Date(year, month, 0).getDate();
     const pad = (n: number) => String(n).padStart(2, '0');
     const defaultDeadline = `${year}-${pad(month)}-${pad(lastDay)}T23:59`;
 
+    const subtitle = period
+      ? `${year} 年 ${month} 月 · 待啟動`
+      : `${year} 年 ${month} 月`;
+
     return (
-      <Shell title="評核管理" subtitle={`${year} 年 ${month} 月`}>
+      <Shell title="評核管理" subtitle={subtitle}>
         {canUnlock ? (
           // 秘書 / 超管 → 直接顯示啟動表單
           <ActivationForm

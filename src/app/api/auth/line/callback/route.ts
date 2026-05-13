@@ -5,7 +5,11 @@ import { setSession, setPendingBind } from '@/lib/session';
 
 const LINE_TOKEN_URL = 'https://api.line.me/oauth2/v2.1/token';
 const LINE_PROFILE_URL = 'https://api.line.me/v2/profile';
-const CALLBACK_URL = 'http://localhost:3000/api/auth/line/callback';
+
+function getCallbackUrl(): string {
+  const base = process.env.APP_BASE_URL ?? 'http://localhost:3000';
+  return `${base}/api/auth/line/callback`;
+}
 
 type LineProfile = {
   userId: string;
@@ -71,7 +75,7 @@ export async function GET(request: Request) {
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       code,
-      redirect_uri: CALLBACK_URL,
+      redirect_uri: getCallbackUrl(),
       client_id: channelId,
       client_secret: channelSecret,
     }),

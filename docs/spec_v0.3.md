@@ -62,7 +62,11 @@ v0.2 相較於 v0.1 的主要更新:
 - ✅ **LINE 推播系統(Messaging API)** — 階段二項目提前實作(2026-05-12)
   - 跟 Email 並行,任一條失敗不影響另一條
   - bot:Nulla Announce @315kvthv
-- ⏳ 自動排程(月初建檔 / 截止關閉)— 下一步,要 Vercel Cron
+- ✅ **自動排程(月初建檔 + 截止關閉)**(2026-05-13)
+  - 月初 cron `/api/cron/start-month`:對每家 `is_active` 組織建一筆 `status='待啟動'` 的本月 row(規格 §3.4 + schema Table 3)
+  - 每日 cron `/api/cron/sweep-deadlines`:把 deadline 過了的「進行中」period 轉成「已截止」+ 未填的 evaluations 轉成「逾期未填」
+  - 用 Vercel Cron 排程(`vercel.json`),認證靠 `CRON_SECRET` 環境變數 + `Authorization: Bearer <CRON_SECRET>`
+  - 「啟動評核」流程同步支援:有「待啟動」row → UPDATE;沒 row → INSERT(向下相容秘書 1 號之前手動啟動)
 - ⏳ Vercel 部署 — 下一步
 - ⏳ LINE 重綁(規格 §4.4)— 下一步
 
@@ -83,10 +87,9 @@ v0.2 相較於 v0.1 的主要更新:
 
 優先順序由內而外:
 
-1. **自動排程 + 正式上線部署** — 兩個合在一起做(2.5h)
-   - 月初自動建立「待啟動」 period(規格 §3.4)
-   - 截止後自動把 period 設成「已截止」+ 未填的 evaluation 設成「逾期未填」
-   - 部署到 Vercel + 環境變數移植 + APP_BASE_URL 改成 Vercel 網址 + LINE callback URL 更新
+1. **正式上線部署** — 自動排程程式碼已寫好(2026-05-13),下一步部署
+   - 部署到 Vercel + 環境變數移植(含新加的 `CRON_SECRET`)+ APP_BASE_URL 改成 Vercel 網址 + LINE callback URL 更新
+   - 部署完 Vercel Cron 才會真的開始跑
 2. **跟隔壁同事一起測試**(部署完馬上做)
 3. **LINE 重綁**(規格 §4.4)(1h)
 4. **「移交清單」備忘**(LINE / Gmail / Vercel / Supabase admin 設定)— Becca 要交接給老闆用
@@ -101,9 +104,26 @@ v0.2 相較於 v0.1 的主要更新:
 | LINE Login channel | ID `2009992101`,LINE Developers Provider「Nullasecretary」 |
 | LINE Messaging API channel | Nulla Announce,bot `@315kvthv`,同 Provider |
 | Gmail SMTP 寄件人 | `nullainc@gmail.com`(App Password 已設) |
-| Vercel | 尚未部署 |
+| Vercel | 帳號已建,尚未部署 |
 | 系統超管 | Becca(NULLA0011) |
 | 系統會計 | 小嫚(NULLA0006) |
+
+### 0.5 環境變數清單(部署 Vercel 時要全部設好)
+
+| 變數 | 用途 | 範例 |
+|------|------|------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase 公開網址 | `https://xxx.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase 公開金鑰 | (從 Supabase 後台 Settings → API 拿) |
+| `SUPABASE_SECRET_KEY` | Supabase 後台金鑰(會繞過 RLS) | (從 Supabase 後台 Settings → API 拿,**只能寫在 server**) |
+| `SESSION_SECRET` | 簽 cookie 的密鑰 | 隨機 32+ 字元字串 |
+| `LINE_CHANNEL_ID` | LINE Login channel ID | `2009992101` |
+| `LINE_CHANNEL_SECRET` | LINE Login channel secret | (從 LINE Developers 拿) |
+| `GMAIL_USER` | Gmail SMTP 寄件帳號 | `nullainc@gmail.com` |
+| `GMAIL_APP_PASSWORD` | Gmail App Password | (Google 帳號 → 安全性 → 應用程式密碼產生) |
+| `LINE_MESSAGING_TOKEN` | LINE Messaging API channel access token | (從 LINE Developers 拿) |
+| `LINE_BOT_ID` | LINE bot ID | `@315kvthv` |
+| `APP_BASE_URL` | 應用程式根網址 | 部署後改成 Vercel 網址(例:`https://nulla-eval.vercel.app`) |
+| `CRON_SECRET` | Vercel Cron 認證用 | 隨機 32+ 字元字串(部署時自己設一個,跟 SESSION_SECRET 不同) |
 
 ---
 

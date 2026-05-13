@@ -3,7 +3,11 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 
 const LINE_AUTHORIZE_URL = 'https://access.line.me/oauth2/v2.1/authorize';
-const CALLBACK_URL = 'http://localhost:3000/api/auth/line/callback';
+
+function getCallbackUrl(): string {
+  const base = process.env.APP_BASE_URL ?? 'http://localhost:3000';
+  return `${base}/api/auth/line/callback`;
+}
 
 export async function GET() {
   const channelId = process.env.LINE_CHANNEL_ID;
@@ -28,7 +32,7 @@ export async function GET() {
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: channelId,
-    redirect_uri: CALLBACK_URL,
+    redirect_uri: getCallbackUrl(),
     state,
     scope: 'profile openid',
   });
