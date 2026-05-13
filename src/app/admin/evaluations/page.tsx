@@ -253,6 +253,7 @@ export default async function AdminEvaluationsPage() {
                     <RemindButton
                       mode="one"
                       evaluatorId={r.evaluator_id}
+                      evaluationId={r.id}
                       label={`提醒 ${nameOf(r.evaluator_id)}`}
                       className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] font-medium text-zinc-600 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400"
                     />

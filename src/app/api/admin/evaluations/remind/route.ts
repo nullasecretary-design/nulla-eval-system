@@ -38,6 +38,9 @@ export async function POST(request: Request) {
   const bodyObj = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
   const evaluatorId =
     typeof bodyObj.evaluatorId === 'string' ? bodyObj.evaluatorId : null;
+  // evaluationId 有傳 = 只提醒這一筆 row(不列該 evaluator 其他未完成項目)
+  const evaluationId =
+    typeof bodyObj.evaluationId === 'string' ? bodyObj.evaluationId : null;
   // scope:'non-ceo' = 全員不含執行長 / 'ceo-only' = 只執行長 / 預設 = 全部
   const scope =
     bodyObj.scope === 'non-ceo' || bodyObj.scope === 'ceo-only'
@@ -65,7 +68,10 @@ export async function POST(request: Request) {
     .eq('period_id', period.id)
     .in('status', ['待填', '已解鎖', '逾期未填']);
 
-  if (evaluatorId) {
+  if (evaluationId) {
+    // 精準提醒單一筆 row(列表上某一行的提醒按鈕)
+    query = query.eq('id', evaluationId);
+  } else if (evaluatorId) {
     query = query.eq('evaluator_id', evaluatorId);
   } else if (scope === 'non-ceo') {
     // 全員不含執行長:CEO 評核 row 的 evaluator_role 一定是「執行長」

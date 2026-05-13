@@ -21,7 +21,7 @@ export type QuarterSummary = {
 
 function fmtScore(n: number | null): string {
   if (n === null) return '—';
-  return n.toFixed(1);
+  return String(Math.round(n));
 }
 
 function WeightedHelp() {

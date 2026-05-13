@@ -67,6 +67,12 @@ v0.2 相較於 v0.1 的主要更新:
   - 每日 cron `/api/cron/sweep-deadlines`:把 deadline 過了的「進行中」period 轉成「已截止」+ 未填的 evaluations 轉成「逾期未填」
   - 用 Vercel Cron 排程(`vercel.json`),認證靠 `CRON_SECRET` 環境變數 + `Authorization: Bearer <CRON_SECRET>`
   - 「啟動評核」流程同步支援:有「待啟動」row → UPDATE;沒 row → INSERT(向下相容秘書 1 號之前手動啟動)
+- ✅ **Vercel 正式部署**(2026-05-13)— `nulla-eval-system.vercel.app`
+  - 12 條環境變數設定(11 條既有 + `CRON_SECRET`)
+  - LINE Login callback URL 加入 vercel 版本
+  - 修掉學長 hardcode bug:LINE start/callback 改讀 `APP_BASE_URL`(原本寫死 localhost,部署後會 400 invalid redirect_uri)
+- ✅ **歷史紀錄分數改整數顯示**(2026-05-13)— 原本一位小數在手機上排版會跑掉
+- ✅ **單筆催繳精準化**(2026-05-13)— 列表上點某一行的「提醒 X」現在只會列那一筆 item,不會列該 evaluator 其他待辦(規格 §9.2 微調)
 - ⏳ Vercel 部署 — 下一步
 - ⏳ LINE 重綁(規格 §4.4)— 下一步
 
@@ -87,14 +93,17 @@ v0.2 相較於 v0.1 的主要更新:
 
 優先順序由內而外:
 
-1. **正式上線部署** — 自動排程程式碼已寫好(2026-05-13),下一步部署
-   - 部署到 Vercel + 環境變數移植(含新加的 `CRON_SECRET`)+ APP_BASE_URL 改成 Vercel 網址 + LINE callback URL 更新
-   - 部署完 Vercel Cron 才會真的開始跑
-2. **跟隔壁同事一起測試**(部署完馬上做)
-3. **LINE 重綁**(規格 §4.4)(1h)
-4. **「移交清單」備忘**(LINE / Gmail / Vercel / Supabase admin 設定)— Becca 要交接給老闆用
-5. **權限調整**(看 Becca 報告完老闆後決定)
-6. **多公司支援 + 切換單位 + 跨公司合併報表**(規格 §2.3 / §8.6)— 看老闆要不要,診所 1/2 要不要上線
+1. **跟同事測試 → 清測試資料**(2026-05-13 進行中)
+2. **歷史評核分數匯入(Excel)**(規劃中,Becca 2026-05-13 提)
+   - 4 月用紙本評核,要把紙本分數匯回系統,讓 Q2 結算可以一鍵算
+   - 可能同時補 Q1(1/2/3 月)— 需要支援「補建不存在的 period 設為已截止」
+   - Excel 一張表 = 一個季度,空白格匯入時跳過
+   - 延用員工匯入的「預覽確認」機制
+3. **下週上線**(目標日期 2026-05-20 前後)
+4. **LINE 重綁**(規格 §4.4)(1h)
+5. **「移交清單」備忘**(LINE / Gmail / Vercel / Supabase admin 設定)— Becca 要交接給老闆用
+6. **權限調整**(看 Becca 報告完老闆後決定)
+7. **多公司支援 + 切換單位 + 跨公司合併報表**(規格 §2.3 / §8.6)— 看老闆要不要,診所 1/2 要不要上線
 
 ### 0.4 設定資產對照
 

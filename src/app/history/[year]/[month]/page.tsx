@@ -28,7 +28,7 @@ function fieldOf(r: EvalRow, key: ItemKey): number {
 }
 
 function fmt(n: number | null): string {
-  return n === null ? '—' : n.toFixed(1);
+  return n === null ? '—' : String(Math.round(n));
 }
 
 export default async function MonthlyDetailPage({

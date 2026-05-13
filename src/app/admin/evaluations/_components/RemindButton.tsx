@@ -7,11 +7,13 @@ type Mode = 'non-ceo' | 'ceo-only' | 'one';
 export function RemindButton({
   mode,
   evaluatorId,
+  evaluationId,
   label,
   className,
 }: {
   mode: Mode;
   evaluatorId?: string;
+  evaluationId?: string;
   label: string;
   className?: string;
 }) {
@@ -26,8 +28,10 @@ export function RemindButton({
     setResult(null);
     try {
       const payload: Record<string, string> = {};
-      if (mode === 'one' && evaluatorId) payload.evaluatorId = evaluatorId;
-      else if (mode === 'non-ceo') payload.scope = 'non-ceo';
+      if (mode === 'one') {
+        if (evaluationId) payload.evaluationId = evaluationId;
+        if (evaluatorId) payload.evaluatorId = evaluatorId;
+      } else if (mode === 'non-ceo') payload.scope = 'non-ceo';
       else if (mode === 'ceo-only') payload.scope = 'ceo-only';
       const res = await fetch('/api/admin/evaluations/remind', {
         method: 'POST',
@@ -113,7 +117,7 @@ export function RemindButton({
                 ? '系統會把本月所有有未完成項目的人(自評 / 主管評)各寄一封,執行長不會收到。'
                 : mode === 'ceo-only'
                   ? '只把執行長未完成的執行長評提醒寄給執行長,其他人不會收到。'
-                  : '系統會寄一封給這個人,信裡列出他自己所有未完成項目。'}
+                  : '系統會寄一封給這個人,只列這一筆未完成項目(不會列出他其他未完成的事)。'}
             </p>
             <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
               系統會同時用 Email 跟 LINE 寄。對方沒設定的會自動略過。
