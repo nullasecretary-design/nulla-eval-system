@@ -24,144 +24,6 @@ v0.2 相較於 v0.1 的主要更新:
 
 ---
 
-## 〇、實作現況 CHANGELOG(v0.3 新增)
-
-> 本節由 Claude Code 在開發過程中持續更新,讓 v0.2 設計書能對齊實際實作。
-> 規格本文(§1 之後)維持原貌作為設計依據,本節記錄做了什麼、改了什麼、還沒做什麼。
-> **新 session 接手前讀這裡就能快速對焦。**
-
-### 0.1 已實作的功能(by date)
-
-**Phase 1 — 環境準備:** 完成
-- LINE Developers 帳號 + LINE Login channel(2026-05)
-- Supabase 帳號 + DB schema(8 表 + RLS)(2026-05)
-- Vercel 帳號(待部署)
-
-**Phase 2 — 核心功能:** 完成
-- 資料庫 schema(規格 §11 + schema_v0.1.md)(2026-05-05)
-- LINE Login + 員工編號綁定(規格 §4)(2026-05-06)
-- 員工自評 / 主管評 / 執行長評,大送出鈕只送有填的(規格 §5.4 / §5.5 / §5.6)(2026-05-07)
-- 員工首頁 Card A 倒數計時 + Card B 歷史紀錄(規格 §5.3)(2026-05-07)
-
-**Phase 3 — 後台與報表:** 完成
-- /admin/evaluations 評核管理(進度卡 + 未完成 + 已完成 + 解鎖)(規格 §9.2)(2026-05-07)
-- 啟動本月評核(原在首頁,**2026-05-12 移到 /admin/evaluations**)(規格 §3.4)
-- 季度報表(列表 + 主表 + 員工詳細 + CSV 下載)(規格 §8)(2026-05-08)
-- **CSV 加下載時間 metadata + 檔名時間戳**(2026-05-12)
-- 員工歷史紀錄三層展開(規格 §5.8)(2026-05-07)
-- **主管 / 執行長 / 超管 看下屬歷史**(規格 §5.8 延伸)(2026-05-12)
-- /admin/employees 員工管理(列表 / 新增 / 編輯 / 停用)(規格 §7 + §9.1)(2026-05-11)
-- **Excel 批次匯入員工**(規格 §7.2)(2026-05-12)
-- **解鎖紀錄頁 /admin/unlocks**(規格 §9.2)(2026-05-12)
-- **執行長 也能進 /admin/evaluations 看自家進度**(規格 §10)(2026-05-12)
-
-**Phase 4 — 通知與自動化:** 部分完成
-- ✅ **Email 通知系統(Gmail SMTP)**(2026-05-12)
-  - 員工填完自評 → 自動寄信給主管(規格 §3.4)
-  - 一鍵催繳全員(不含執行長)+ 提醒執行長 + 單獨提醒(規格 §9.2)
-- ✅ **LINE 推播系統(Messaging API)** — 階段二項目提前實作(2026-05-12)
-  - 跟 Email 並行,任一條失敗不影響另一條
-  - bot:Nulla Announce @315kvthv
-- ✅ **自動排程(月初建檔 + 截止關閉)**(2026-05-13)
-  - 月初 cron `/api/cron/start-month`:對每家 `is_active` 組織建一筆 `status='待啟動'` 的本月 row(規格 §3.4 + schema Table 3)
-  - 每日 cron `/api/cron/sweep-deadlines`:把 deadline 過了的「進行中」period 轉成「已截止」+ 未填的 evaluations 轉成「逾期未填」
-  - 用 Vercel Cron 排程(`vercel.json`),認證靠 `CRON_SECRET` 環境變數 + `Authorization: Bearer <CRON_SECRET>`
-  - 「啟動評核」流程同步支援:有「待啟動」row → UPDATE;沒 row → INSERT(向下相容秘書 1 號之前手動啟動)
-- ✅ **Vercel 正式部署**(2026-05-13)— `nulla-eval-system.vercel.app`
-  - 12 條環境變數設定(11 條既有 + `CRON_SECRET`)
-  - LINE Login callback URL 加入 vercel 版本
-  - 修掉學長 hardcode bug:LINE start/callback 改讀 `APP_BASE_URL`(原本寫死 localhost,部署後會 400 invalid redirect_uri)
-- ✅ **歷史紀錄分數改整數顯示**(2026-05-13)— 原本一位小數在手機上排版會跑掉
-- ✅ **單筆催繳精準化**(2026-05-13)— 列表上點某一行的「提醒 X」現在只會列那一筆 item,不會列該 evaluator 其他待辦(規格 §9.2 微調)
-- ✅ **啟動評核時 kickoff 通知**(2026-05-13)— 規格 §3.4 漏實作:秘書按下啟動鈕後 自動 Email + LINE 通知所有要填的人。寄不到只 log,不擋啟動成功
-- ✅ **修自評送出後通知主管 bug**(2026-05-13)— 原本 fire-and-forget,Vercel function 結束會丟掉 promise。改成 await 確保送出
-- ✅ **歷史評核 Excel 匯入功能**(2026-05-13)
-  - `/admin/import-history` 新頁面(秘書 / 會計 / 超管 可進)
-  - 選季度 → 下載範本(系統幫填年/月/姓名/角色)→ 填分數 → 上傳預覽 → 確認匯入
-  - 範本內排序:每月 自評 6 → 執行長 6 → 主管 2(對應 Becca 紙本順序)
-  - 空白整列跳過、已存在自動跳過(不覆蓋)
-  - 補建不存在的 period 為「已截止」(歷史月份語意)
-  - 自動寫 evaluation_logs 留痕(reason='歷史 Excel 匯入')
-- ✅ **LINE 重綁:後台代解綁**(規格 §4.4,2026-05-13)
-  - 員工編輯頁多了「LINE 綁定狀態」區塊
-  - 秘書可解綁同公司一般員工 / 主管;高權限者(會計 / 執行長 / 超管)只有超管能解
-  - 解綁 = `employees.line_user_id` 設 NULL,該員工下次登入會走「首次綁定」流程
-  - 寫 `line_binding_history` 留痕(誰解、何時、為什麼)
-  - 員工自助流程(spec §4.4 A)沒做 — YAGNI,小公司有事直接找秘書/超管處理
-- ✅ **Email 動作審計通知:解鎖 + 解綁**(Becca 2026-05-13 加)
-  - 規格 §6.2 原寫「解鎖純 log 不通知」,Becca 看到後改成「寄 email 給所有秘書 + 超管」當動作備份
-  - 解鎖評核分數時:寄信給該 org 所有「秘書 / 超管」的 `company_email`,信裡列出被解的人 / 評核者 / 月份 / 角色 / 原因 + 連結到 `/admin/unlocks`
-  - 解除 LINE 綁定時:同上 pattern,信裡列出被解綁的對象
-  - 不發 LINE(動作備份不需要即時推送,email 留底比較適合)
-  - 失敗只 log,不擋主動作成功
-- ✅ **移交清單 + docx 轉檔 script**(2026-05-13)
-  - `docs/移交清單.md` 給老闆 / 未來接手者的快速上手手冊(系統、帳號、例行操作、應急處理、未來開發 backlog)
-  - `docs/移交清單.docx` Word 版(同內容)
-  - `scripts/md-to-docx.mjs` 通用 md→docx 轉檔工具(用 `npm install --no-save docx marked` 跑),未來改 md 後可隨手重產 docx
-- ✅ **管理者身分變更通知**(規格 §9.1,Becca 2026-05-13 加實作)
-  - 觸發點:單筆新增員工(設了非「無」)/ 編輯員工改 admin_role / Excel 匯入帶 admin_role
-  - 收件人:**該 org 所有「超級管理員」**(Becca 從原規格「超管+會計」簡化成「只超管」)
-  - 內容:對象姓名 + 員工編號 + 變更前 → 變更後 + 變更者
-  - 沒做獨立 audit 資料庫表 — Becca 決定:email 留底就夠用,不寫表(YAGNI)
-- ⏳ Vercel 部署 — 下一步
-- ⏳ LINE 重綁(規格 §4.4)— 下一步
-
-### 0.2 從 v0.2 設計改動的部分
-
-| 規格 § | 原本設計 | 改成 | 原因 |
-|--------|---------|------|------|
-| §5.5 | 員工沒填自評時主管畫面顯示「等待員工自評中」,主管無法開始評 | 主管隨時可填,送出邏輯改成 skip-empty(沒填的不送出) | Becca 2026-05-08 修正:不該卡主管,鎖被拿掉的同時送出邏輯也改 |
-| §8.2 | 報表摘要區兩張卡:全公司平均 + 缺評提醒 | 只留缺評提醒,**拿掉全公司平均卡** | Becca:不要 |
-| §8.3 | 員工詳細頁有「主/執行長落差」欄(≥10 分黃底警示) | **拿掉落差欄** | Becca:目前不用,等診所上線再考慮 |
-| §3.4 | 啟動評核入口在首頁 Card A | **移到 /admin/evaluations 直接顯示啟動表單** | Becca:首頁同位置兩種意義太混亂(雙重身分:啟動者也是評核者) |
-| §9.2 | 一鍵寄提醒(給所有未完成者) | **拆成兩顆:全員(不含執行長)+ 提醒執行長** | Becca:CEO 跟員工催法不同,CEO 通常需要會計或秘書親自講 |
-| §11.1 | Email 用 Resend / SendGrid 免費方案 | **改用 Gmail SMTP + App Password** | 用公司既有的 nullainc@gmail.com 比較自然,寄件人就是公司,不用設 DNS |
-| §11.1 | LINE 推播是「階段二」 | **階段二項目 2026-05-12 一併做完** | 員工本來就在用 LINE 登入,推播更即時 |
-| §9.1 | (規格寫匯入支援所有職位 / 管理者身分) | **Excel 匯入排除「執行長」「超級管理員」** | 防呆:重要角色必須走單筆新增 |
-
-### 0.3 還沒做的(下一個 session 的工)
-
-優先順序由內而外:
-
-1. **清測試資料**(Becca 2026-05-13 進行中)— `supabase/queries/dev_clear_pre_launch.sql` 清 NULLA 1-5 月所有測試+假資料
-2. **匯入歷史評核分數**(歷史匯入功能 ✅ 已完成,等 Becca 拿 4 月紙本 / Q1 紙本來實際匯入)
-3. **下週上線**(目標日期 2026-05-20 前後)
-4. **「移交清單」備忘**(LINE / Gmail / Vercel / Supabase admin 設定)— Becca 要交接給老闆用
-5. **報告老闆 + 等回應**(LINE bot 換成老闆的?多公司支援要不要做?)
-6. **權限調整**(看 Becca 報告完老闆後決定)
-7. **多公司支援 + 切換單位 + 跨公司合併報表**(規格 §2.3 / §8.6)— 看老闆要不要,診所 1/2 要不要上線
-
-### 0.4 設定資產對照
-
-| 項目 | 用什麼 / 帳號 |
-|------|---------|
-| Supabase project | `cpyunyfwdjezasyobwey.supabase.co` |
-| LINE Login channel | ID `2009992101`,LINE Developers Provider「Nullasecretary」 |
-| LINE Messaging API channel | Nulla Announce,bot `@315kvthv`,同 Provider |
-| Gmail SMTP 寄件人 | `nullainc@gmail.com`(App Password 已設) |
-| Vercel | 帳號已建,尚未部署 |
-| 系統超管 | Becca(NULLA0011) |
-| 系統會計 | 小嫚(NULLA0006) |
-
-### 0.5 環境變數清單(部署 Vercel 時要全部設好)
-
-| 變數 | 用途 | 範例 |
-|------|------|------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase 公開網址 | `https://xxx.supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase 公開金鑰 | (從 Supabase 後台 Settings → API 拿) |
-| `SUPABASE_SECRET_KEY` | Supabase 後台金鑰(會繞過 RLS) | (從 Supabase 後台 Settings → API 拿,**只能寫在 server**) |
-| `SESSION_SECRET` | 簽 cookie 的密鑰 | 隨機 32+ 字元字串 |
-| `LINE_CHANNEL_ID` | LINE Login channel ID | `2009992101` |
-| `LINE_CHANNEL_SECRET` | LINE Login channel secret | (從 LINE Developers 拿) |
-| `GMAIL_USER` | Gmail SMTP 寄件帳號 | `nullainc@gmail.com` |
-| `GMAIL_APP_PASSWORD` | Gmail App Password | (Google 帳號 → 安全性 → 應用程式密碼產生) |
-| `LINE_MESSAGING_TOKEN` | LINE Messaging API channel access token | (從 LINE Developers 拿) |
-| `LINE_BOT_ID` | LINE bot ID | `@315kvthv` |
-| `APP_BASE_URL` | 應用程式根網址 | 部署後改成 Vercel 網址(例:`https://nulla-eval.vercel.app`) |
-| `CRON_SECRET` | Vercel Cron 認證用 | 隨機 32+ 字元字串(部署時自己設一個,跟 SESSION_SECRET 不同) |
-
----
-
 ## 一、專案背景與目標
 
 ### 1.1 為什麼要做這個系統
@@ -934,3 +796,141 @@ v0.2 相較於 v0.1 的主要更新:
 > **文件結束。**
 >
 > 下次對話請帶上此文件,繼續從「切換單位介面」與「邊緣情境處理」開始討論。
+
+---
+
+## 附錄 A:實作現況 CHANGELOG
+
+> 本節由 Claude Code 在開發過程中持續更新,讓 v0.2 設計書能對齊實際實作。
+> 規格本文(§1 之後)維持原貌作為設計依據,本節記錄做了什麼、改了什麼、還沒做什麼。
+> **新 session 接手前讀這裡就能快速對焦。**
+
+### 0.1 已實作的功能(by date)
+
+**Phase 1 — 環境準備:** 完成
+- LINE Developers 帳號 + LINE Login channel(2026-05)
+- Supabase 帳號 + DB schema(8 表 + RLS)(2026-05)
+- Vercel 帳號(待部署)
+
+**Phase 2 — 核心功能:** 完成
+- 資料庫 schema(規格 §11 + schema_v0.1.md)(2026-05-05)
+- LINE Login + 員工編號綁定(規格 §4)(2026-05-06)
+- 員工自評 / 主管評 / 執行長評,大送出鈕只送有填的(規格 §5.4 / §5.5 / §5.6)(2026-05-07)
+- 員工首頁 Card A 倒數計時 + Card B 歷史紀錄(規格 §5.3)(2026-05-07)
+
+**Phase 3 — 後台與報表:** 完成
+- /admin/evaluations 評核管理(進度卡 + 未完成 + 已完成 + 解鎖)(規格 §9.2)(2026-05-07)
+- 啟動本月評核(原在首頁,**2026-05-12 移到 /admin/evaluations**)(規格 §3.4)
+- 季度報表(列表 + 主表 + 員工詳細 + CSV 下載)(規格 §8)(2026-05-08)
+- **CSV 加下載時間 metadata + 檔名時間戳**(2026-05-12)
+- 員工歷史紀錄三層展開(規格 §5.8)(2026-05-07)
+- **主管 / 執行長 / 超管 看下屬歷史**(規格 §5.8 延伸)(2026-05-12)
+- /admin/employees 員工管理(列表 / 新增 / 編輯 / 停用)(規格 §7 + §9.1)(2026-05-11)
+- **Excel 批次匯入員工**(規格 §7.2)(2026-05-12)
+- **解鎖紀錄頁 /admin/unlocks**(規格 §9.2)(2026-05-12)
+- **執行長 也能進 /admin/evaluations 看自家進度**(規格 §10)(2026-05-12)
+
+**Phase 4 — 通知與自動化:** 部分完成
+- ✅ **Email 通知系統(Gmail SMTP)**(2026-05-12)
+  - 員工填完自評 → 自動寄信給主管(規格 §3.4)
+  - 一鍵催繳全員(不含執行長)+ 提醒執行長 + 單獨提醒(規格 §9.2)
+- ✅ **LINE 推播系統(Messaging API)** — 階段二項目提前實作(2026-05-12)
+  - 跟 Email 並行,任一條失敗不影響另一條
+  - bot:Nulla Announce @315kvthv
+- ✅ **自動排程(月初建檔 + 截止關閉)**(2026-05-13)
+  - 月初 cron `/api/cron/start-month`:對每家 `is_active` 組織建一筆 `status='待啟動'` 的本月 row(規格 §3.4 + schema Table 3)
+  - 每日 cron `/api/cron/sweep-deadlines`:把 deadline 過了的「進行中」period 轉成「已截止」+ 未填的 evaluations 轉成「逾期未填」
+  - 用 Vercel Cron 排程(`vercel.json`),認證靠 `CRON_SECRET` 環境變數 + `Authorization: Bearer <CRON_SECRET>`
+  - 「啟動評核」流程同步支援:有「待啟動」row → UPDATE;沒 row → INSERT(向下相容秘書 1 號之前手動啟動)
+- ✅ **Vercel 正式部署**(2026-05-13)— `nulla-eval-system.vercel.app`
+  - 12 條環境變數設定(11 條既有 + `CRON_SECRET`)
+  - LINE Login callback URL 加入 vercel 版本
+  - 修掉學長 hardcode bug:LINE start/callback 改讀 `APP_BASE_URL`(原本寫死 localhost,部署後會 400 invalid redirect_uri)
+- ✅ **歷史紀錄分數改整數顯示**(2026-05-13)— 原本一位小數在手機上排版會跑掉
+- ✅ **單筆催繳精準化**(2026-05-13)— 列表上點某一行的「提醒 X」現在只會列那一筆 item,不會列該 evaluator 其他待辦(規格 §9.2 微調)
+- ✅ **啟動評核時 kickoff 通知**(2026-05-13)— 規格 §3.4 漏實作:秘書按下啟動鈕後 自動 Email + LINE 通知所有要填的人。寄不到只 log,不擋啟動成功
+- ✅ **修自評送出後通知主管 bug**(2026-05-13)— 原本 fire-and-forget,Vercel function 結束會丟掉 promise。改成 await 確保送出
+- ✅ **歷史評核 Excel 匯入功能**(2026-05-13)
+  - `/admin/import-history` 新頁面(秘書 / 會計 / 超管 可進)
+  - 選季度 → 下載範本(系統幫填年/月/姓名/角色)→ 填分數 → 上傳預覽 → 確認匯入
+  - 範本內排序:每月 自評 6 → 執行長 6 → 主管 2(對應 Becca 紙本順序)
+  - 空白整列跳過、已存在自動跳過(不覆蓋)
+  - 補建不存在的 period 為「已截止」(歷史月份語意)
+  - 自動寫 evaluation_logs 留痕(reason='歷史 Excel 匯入')
+- ✅ **LINE 重綁:後台代解綁**(規格 §4.4,2026-05-13)
+  - 員工編輯頁多了「LINE 綁定狀態」區塊
+  - 秘書可解綁同公司一般員工 / 主管;高權限者(會計 / 執行長 / 超管)只有超管能解
+  - 解綁 = `employees.line_user_id` 設 NULL,該員工下次登入會走「首次綁定」流程
+  - 寫 `line_binding_history` 留痕(誰解、何時、為什麼)
+  - 員工自助流程(spec §4.4 A)沒做 — YAGNI,小公司有事直接找秘書/超管處理
+- ✅ **Email 動作審計通知:解鎖 + 解綁**(Becca 2026-05-13 加)
+  - 規格 §6.2 原寫「解鎖純 log 不通知」,Becca 看到後改成「寄 email 給所有秘書 + 超管」當動作備份
+  - 解鎖評核分數時:寄信給該 org 所有「秘書 / 超管」的 `company_email`,信裡列出被解的人 / 評核者 / 月份 / 角色 / 原因 + 連結到 `/admin/unlocks`
+  - 解除 LINE 綁定時:同上 pattern,信裡列出被解綁的對象
+  - 不發 LINE(動作備份不需要即時推送,email 留底比較適合)
+  - 失敗只 log,不擋主動作成功
+- ✅ **移交清單 + docx 轉檔 script**(2026-05-13)
+  - `docs/移交清單.md` 給老闆 / 未來接手者的快速上手手冊(系統、帳號、例行操作、應急處理、未來開發 backlog)
+  - `docs/移交清單.docx` Word 版(同內容)
+  - `scripts/md-to-docx.mjs` 通用 md→docx 轉檔工具(用 `npm install --no-save docx marked` 跑),未來改 md 後可隨手重產 docx
+- ✅ **管理者身分變更通知**(規格 §9.1,Becca 2026-05-13 加實作)
+  - 觸發點:單筆新增員工(設了非「無」)/ 編輯員工改 admin_role / Excel 匯入帶 admin_role
+  - 收件人:**該 org 所有「超級管理員」**(Becca 從原規格「超管+會計」簡化成「只超管」)
+  - 內容:對象姓名 + 員工編號 + 變更前 → 變更後 + 變更者
+  - 沒做獨立 audit 資料庫表 — Becca 決定:email 留底就夠用,不寫表(YAGNI)
+- ⏳ Vercel 部署 — 下一步
+- ⏳ LINE 重綁(規格 §4.4)— 下一步
+
+### 0.2 從 v0.2 設計改動的部分
+
+| 規格 § | 原本設計 | 改成 | 原因 |
+|--------|---------|------|------|
+| §5.5 | 員工沒填自評時主管畫面顯示「等待員工自評中」,主管無法開始評 | 主管隨時可填,送出邏輯改成 skip-empty(沒填的不送出) | Becca 2026-05-08 修正:不該卡主管,鎖被拿掉的同時送出邏輯也改 |
+| §8.2 | 報表摘要區兩張卡:全公司平均 + 缺評提醒 | 只留缺評提醒,**拿掉全公司平均卡** | Becca:不要 |
+| §8.3 | 員工詳細頁有「主/執行長落差」欄(≥10 分黃底警示) | **拿掉落差欄** | Becca:目前不用,等診所上線再考慮 |
+| §3.4 | 啟動評核入口在首頁 Card A | **移到 /admin/evaluations 直接顯示啟動表單** | Becca:首頁同位置兩種意義太混亂(雙重身分:啟動者也是評核者) |
+| §9.2 | 一鍵寄提醒(給所有未完成者) | **拆成兩顆:全員(不含執行長)+ 提醒執行長** | Becca:CEO 跟員工催法不同,CEO 通常需要會計或秘書親自講 |
+| §11.1 | Email 用 Resend / SendGrid 免費方案 | **改用 Gmail SMTP + App Password** | 用公司既有的 nullainc@gmail.com 比較自然,寄件人就是公司,不用設 DNS |
+| §11.1 | LINE 推播是「階段二」 | **階段二項目 2026-05-12 一併做完** | 員工本來就在用 LINE 登入,推播更即時 |
+| §9.1 | (規格寫匯入支援所有職位 / 管理者身分) | **Excel 匯入排除「執行長」「超級管理員」** | 防呆:重要角色必須走單筆新增 |
+
+### 0.3 還沒做的(下一個 session 的工)
+
+優先順序由內而外:
+
+1. **清測試資料**(Becca 2026-05-13 進行中)— `supabase/queries/dev_clear_pre_launch.sql` 清 NULLA 1-5 月所有測試+假資料
+2. **匯入歷史評核分數**(歷史匯入功能 ✅ 已完成,等 Becca 拿 4 月紙本 / Q1 紙本來實際匯入)
+3. **下週上線**(目標日期 2026-05-20 前後)
+4. **「移交清單」備忘**(LINE / Gmail / Vercel / Supabase admin 設定)— Becca 要交接給老闆用
+5. **報告老闆 + 等回應**(LINE bot 換成老闆的?多公司支援要不要做?)
+6. **權限調整**(看 Becca 報告完老闆後決定)
+7. **多公司支援 + 切換單位 + 跨公司合併報表**(規格 §2.3 / §8.6)— 看老闆要不要,診所 1/2 要不要上線
+
+### 0.4 設定資產對照
+
+| 項目 | 用什麼 / 帳號 |
+|------|---------|
+| Supabase project | `cpyunyfwdjezasyobwey.supabase.co` |
+| LINE Login channel | ID `2009992101`,LINE Developers Provider「Nullasecretary」 |
+| LINE Messaging API channel | Nulla Announce,bot `@315kvthv`,同 Provider |
+| Gmail SMTP 寄件人 | `nullainc@gmail.com`(App Password 已設) |
+| Vercel | 帳號已建,尚未部署 |
+| 系統超管 | Becca(NULLA0011) |
+| 系統會計 | 小嫚(NULLA0006) |
+
+### 0.5 環境變數清單(部署 Vercel 時要全部設好)
+
+| 變數 | 用途 | 範例 |
+|------|------|------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase 公開網址 | `https://xxx.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase 公開金鑰 | (從 Supabase 後台 Settings → API 拿) |
+| `SUPABASE_SECRET_KEY` | Supabase 後台金鑰(會繞過 RLS) | (從 Supabase 後台 Settings → API 拿,**只能寫在 server**) |
+| `SESSION_SECRET` | 簽 cookie 的密鑰 | 隨機 32+ 字元字串 |
+| `LINE_CHANNEL_ID` | LINE Login channel ID | `2009992101` |
+| `LINE_CHANNEL_SECRET` | LINE Login channel secret | (從 LINE Developers 拿) |
+| `GMAIL_USER` | Gmail SMTP 寄件帳號 | `nullainc@gmail.com` |
+| `GMAIL_APP_PASSWORD` | Gmail App Password | (Google 帳號 → 安全性 → 應用程式密碼產生) |
+| `LINE_MESSAGING_TOKEN` | LINE Messaging API channel access token | (從 LINE Developers 拿) |
+| `LINE_BOT_ID` | LINE bot ID | `@315kvthv` |
+| `APP_BASE_URL` | 應用程式根網址 | 部署後改成 Vercel 網址(例:`https://nulla-eval.vercel.app`) |
+| `CRON_SECRET` | Vercel Cron 認證用 | 隨機 32+ 字元字串(部署時自己設一個,跟 SESSION_SECRET 不同) |
