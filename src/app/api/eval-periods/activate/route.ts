@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { buildKickoffNotice, sendEmail } from '@/lib/email';
+import { buildKickoffLine, pushLine } from '@/lib/line';
+
+function formatDeadlineLabel(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 function bad(message: string, status = 400) {
   return new NextResponse(message, { status });
@@ -161,9 +168,51 @@ export async function POST(request: Request) {
     return bad('建立評核 row 失敗:' + evalsErr.message, 500);
   }
 
+  // 規格 §3.4:啟動後自動通知所有有評核要填的人(自評 / 主管 / 執行長)。
+  // dedupe evaluator_id,Email + LINE 並行寄,失敗不影響本次啟動成功。
+  const evaluatorIds = Array.from(new Set(evalRows.map((r) => r.evaluator_id)));
+  const { data: evaluatorEmps } = await supabaseAdmin
+    .from('employees')
+    .select('employee_number, name, company_email, line_user_id')
+    .in('employee_number', evaluatorIds);
+
+  const deadlineLabel = formatDeadlineLabel(deadline);
+  const notifyTasks: Promise<unknown>[] = [];
+  for (const emp of evaluatorEmps ?? []) {
+    if (emp.company_email) {
+      const mail = buildKickoffNotice({
+        recipientName: emp.name,
+        year,
+        month,
+        deadlineLabel,
+      });
+      notifyTasks.push(
+        sendEmail({ to: emp.company_email, ...mail }).catch((e) =>
+          console.error('[activate] kickoff email failed:', emp.name, e)
+        )
+      );
+    }
+    if (emp.line_user_id) {
+      const text = buildKickoffLine({
+        recipientName: emp.name,
+        year,
+        month,
+        deadlineLabel,
+      });
+      notifyTasks.push(
+        pushLine({ to: emp.line_user_id, text }).catch((e) =>
+          console.error('[activate] kickoff LINE failed:', emp.name, e)
+        )
+      );
+    }
+  }
+  // 並行等所有通知,但即使全部失敗也不擋啟動結果
+  await Promise.allSettled(notifyTasks);
+
   return NextResponse.json({
     ok: true,
     period_id: periodId,
     rows_created: evalRows.length,
+    notified: evaluatorEmps?.length ?? 0,
   });
 }

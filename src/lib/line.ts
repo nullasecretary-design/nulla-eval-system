@@ -75,6 +75,24 @@ export function buildSelfDoneLine(opts: {
   ].join('\n');
 }
 
+export function buildKickoffLine(opts: {
+  recipientName: string;
+  year: number;
+  month: number;
+  deadlineLabel: string;
+}): string {
+  const link = `${APP_BASE_URL}/evaluations/me`;
+  return [
+    `🔔 NULLA 評核啟動`,
+    ``,
+    `${opts.recipientName} 您好,${opts.year}/${opts.month} 評核已開始,請進系統填寫您負責的部分。`,
+    ``,
+    `截止:${opts.deadlineLabel}`,
+    ``,
+    `進系統:${link}`,
+  ].join('\n');
+}
+
 export function buildReminderLine(opts: {
   recipientName: string;
   year: number;

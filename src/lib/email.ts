@@ -101,6 +101,29 @@ export function buildSelfDoneNotice(opts: {
 }
 
 /**
+ * 秘書啟動本月評核 → 通知全體有評核要填的員工(規格 §3.4)。
+ */
+export function buildKickoffNotice(opts: {
+  recipientName: string;
+  year: number;
+  month: number;
+  deadlineLabel: string; // 已格式化的中文日期 e.g. "2026/05/31 23:59"
+}): { subject: string; html: string; text: string } {
+  const { recipientName, year, month, deadlineLabel } = opts;
+  const link = `${APP_BASE_URL}/evaluations/me`;
+  const subject = `${year}/${month} 評核開始,請開始填寫`;
+  const html = shell(`
+    <h2 style="margin:0 0 12px;font-size:18px;color:#18181b;">本月評核開始</h2>
+    <p style="margin:0 0 8px;">${recipientName} 您好,</p>
+    <p style="margin:0 0 12px;">${year} 年 ${month} 月評核已經啟動,請進系統填寫您負責的部分(自評 / 主管評 / 執行長評)。</p>
+    <p style="margin:0 0 20px;"><strong>截止時間:${deadlineLabel}</strong></p>
+    <a href="${link}" style="display:inline-block;padding:10px 18px;background:#0284c7;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">進系統填寫 →</a>
+  `);
+  const text = `${year}/${month} 評核已啟動,請進系統填寫您負責的部分。截止:${deadlineLabel}。${link}`;
+  return { subject, html, text };
+}
+
+/**
  * 一鍵 / 單獨催繳:某人本月還有未完成的評核。
  */
 export function buildReminderNotice(opts: {
