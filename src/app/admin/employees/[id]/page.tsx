@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { EmployeeForm, type ManagerOption } from '../_components/EmployeeForm';
+import { UnbindLineSection } from '../_components/UnbindLineSection';
 
 export default async function EditEmployeePage({
   params,
@@ -31,7 +32,7 @@ export default async function EditEmployeePage({
   const { data: emp } = await supabaseAdmin
     .from('employees')
     .select(
-      'employee_number, name, org_id, department, job_title, position, admin_role, manager_id, company_email, status, hired_at, left_at'
+      'employee_number, name, org_id, department, job_title, position, admin_role, manager_id, company_email, status, hired_at, left_at, line_user_id'
     )
     .eq('employee_number', employeeNumber)
     .maybeSingle();
@@ -61,6 +62,16 @@ export default async function EditEmployeePage({
     .order('employee_number', { ascending: true });
   const managers: ManagerOption[] = managerCandidates ?? [];
 
+  // LINE 解綁權限:秘書 不能解高權限者(會計 / 執行長 / 超管),超管 都可以
+  const targetIsHighPriv =
+    emp.position === '執行長' ||
+    emp.admin_role === '會計' ||
+    emp.admin_role === '超級管理員';
+  const canUnbindLine = canSetAdminRole || !targetIsHighPriv;
+  const disabledReason = !canUnbindLine
+    ? '高權限者(會計 / 執行長 / 超管)只能由超級管理員解綁'
+    : undefined;
+
   return (
     <Shell title={`編輯:${emp.name}`} subtitle={emp.employee_number}>
       <EmployeeForm
@@ -80,6 +91,13 @@ export default async function EditEmployeePage({
         }}
         managers={managers}
         canSetAdminRole={canSetAdminRole}
+      />
+      <UnbindLineSection
+        employeeNumber={emp.employee_number}
+        employeeName={emp.name}
+        hasLine={!!emp.line_user_id}
+        canUnbind={canUnbindLine}
+        disabledReason={disabledReason}
       />
     </Shell>
   );
