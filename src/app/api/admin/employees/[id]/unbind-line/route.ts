@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { buildUnbindLineAuditNotice, sendEmail } from '@/lib/email';
 
 function bad(message: string, status = 400) {
   return new NextResponse(message, { status });
@@ -22,7 +23,7 @@ export async function POST(
 
   const { data: actor } = await supabaseAdmin
     .from('employees')
-    .select('employee_number, org_id, admin_role, status')
+    .select('employee_number, name, org_id, admin_role, status')
     .eq('employee_number', session.employee_number)
     .single();
   if (!actor) return bad('找不到使用者', 404);
@@ -85,5 +86,43 @@ export async function POST(
     console.error('[unbind-line] history insert failed:', histErr.message);
   }
 
+  // 動作審計通知:寄 email 給所有秘書 + 超管(限同 org)
+  await sendAuditEmails(actor.name, target.org_id, target.name, target.employee_number)
+    .catch((e) => console.error('[unbind-line] audit email failed:', e));
+
   return NextResponse.json({ ok: true, target_name: target.name });
+}
+
+async function sendAuditEmails(
+  actorName: string,
+  targetOrgId: string,
+  targetName: string,
+  targetEmpNum: string
+): Promise<void> {
+  const { data: admins } = await supabaseAdmin
+    .from('employees')
+    .select('company_email')
+    .eq('org_id', targetOrgId)
+    .in('admin_role', ['秘書', '超級管理員'])
+    .eq('status', '在職');
+
+  const emails = (admins ?? [])
+    .map((a) => a.company_email)
+    .filter((v): v is string => !!v);
+
+  if (emails.length === 0) return;
+
+  const mail = buildUnbindLineAuditNotice({
+    actorName,
+    targetName,
+    targetEmpNum,
+  });
+
+  await Promise.allSettled(
+    emails.map((to) =>
+      sendEmail({ to, ...mail }).catch((e) =>
+        console.error('[unbind-line] email to', to, 'failed:', e)
+      )
+    )
+  );
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { buildUnlockAuditNotice, sendEmail } from '@/lib/email';
 
 function bad(message: string, status = 400) {
   return new NextResponse(message, { status });
@@ -18,7 +19,7 @@ export async function POST(
   // Auth
   const { data: actor } = await supabaseAdmin
     .from('employees')
-    .select('employee_number, org_id, admin_role, status')
+    .select('employee_number, name, org_id, admin_role, status')
     .eq('employee_number', session.employee_number)
     .single();
   if (!actor) return bad('找不到使用者', 404);
@@ -39,21 +40,24 @@ export async function POST(
       ? (body as { reason: string }).reason.trim()
       : '';
 
-  // Look up eval row + its period (for org check)
+  // Look up eval row + its period (for org check + audit email)
   const { data: evalRow } = await supabaseAdmin
     .from('evaluations')
     .select(
-      'id, status, score_efficiency, score_quality, score_cooperation, score_attendance, evaluation_periods!inner(org_id)'
+      'id, status, evaluatee_id, evaluator_id, evaluator_role, score_efficiency, score_quality, score_cooperation, score_attendance, evaluation_periods!inner(org_id, year, month)'
     )
     .eq('id', id)
     .maybeSingle<{
       id: string;
       status: string;
+      evaluatee_id: string;
+      evaluator_id: string;
+      evaluator_role: '自評' | '主管' | '執行長';
       score_efficiency: number | null;
       score_quality: number | null;
       score_cooperation: number | null;
       score_attendance: number | null;
-      evaluation_periods: { org_id: string };
+      evaluation_periods: { org_id: string; year: number; month: number };
     }>();
   if (!evalRow) return bad('找不到評核紀錄', 404);
 
@@ -96,5 +100,70 @@ export async function POST(
     console.error('evaluation_logs insert failed:', logErr.message);
   }
 
+  // 動作審計通知:寄 email 給所有秘書 + 超管(Becca's add 2026-05-13,規格 §6.2 補強)
+  await sendAuditEmails(
+    actor.name,
+    actor.org_id,
+    evalRow.evaluatee_id,
+    evalRow.evaluator_id,
+    evalRow.evaluator_role,
+    evalRow.evaluation_periods.year,
+    evalRow.evaluation_periods.month,
+    reason || null
+  ).catch((e) => console.error('[unlock] audit email failed:', e));
+
   return NextResponse.json({ ok: true });
+}
+
+// 寄 email 通知所有秘書 / 超管 — 動作備份用。失敗不擋解鎖成功。
+async function sendAuditEmails(
+  actorName: string,
+  actorOrgId: string,
+  evaluateeId: string,
+  evaluatorId: string,
+  evaluatorRole: '自評' | '主管' | '執行長',
+  year: number,
+  month: number,
+  reason: string | null
+): Promise<void> {
+  // 找姓名
+  const { data: relatedEmps } = await supabaseAdmin
+    .from('employees')
+    .select('employee_number, name')
+    .in('employee_number', [evaluateeId, evaluatorId]);
+  const nameMap = new Map((relatedEmps ?? []).map((e) => [e.employee_number, e.name]));
+  const evaluateeName = nameMap.get(evaluateeId) ?? evaluateeId;
+  const evaluatorName = nameMap.get(evaluatorId) ?? evaluatorId;
+
+  // 找所有秘書 + 超管(限同 org;超管跨 org 也只通知自己 org 的同事 — keep it simple)
+  const { data: admins } = await supabaseAdmin
+    .from('employees')
+    .select('company_email')
+    .eq('org_id', actorOrgId)
+    .in('admin_role', ['秘書', '超級管理員'])
+    .eq('status', '在職');
+
+  const emails = (admins ?? [])
+    .map((a) => a.company_email)
+    .filter((v): v is string => !!v);
+
+  if (emails.length === 0) return;
+
+  const mail = buildUnlockAuditNotice({
+    actorName,
+    evaluateeName,
+    evaluatorName,
+    evaluatorRole,
+    year,
+    month,
+    reason,
+  });
+
+  await Promise.allSettled(
+    emails.map((to) =>
+      sendEmail({ to, ...mail }).catch((e) =>
+        console.error('[unlock] email to', to, 'failed:', e)
+      )
+    )
+  );
 }

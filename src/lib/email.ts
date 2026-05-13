@@ -124,6 +124,63 @@ export function buildKickoffNotice(opts: {
 }
 
 /**
+ * 後台動作審計通知:解鎖評核分數(Becca's add 2026-05-13)。
+ * 寄給所有秘書 + 超管,actor 也收一份(動作備份)。
+ */
+export function buildUnlockAuditNotice(opts: {
+  actorName: string;
+  evaluateeName: string;
+  evaluatorName: string;
+  evaluatorRole: '自評' | '主管' | '執行長';
+  year: number;
+  month: number;
+  reason: string | null;
+}): { subject: string; html: string; text: string } {
+  const { actorName, evaluateeName, evaluatorName, evaluatorRole, year, month, reason } = opts;
+  const link = `${APP_BASE_URL}/admin/unlocks`;
+  const subject = `[NULLA] 評核分數已解鎖:${evaluateeName} 的 ${year}/${month} ${evaluatorRole}評`;
+  const html = shell(`
+    <h2 style="margin:0 0 12px;font-size:18px;color:#18181b;">評核分數解鎖紀錄</h2>
+    <p style="margin:0 0 8px;">${actorName} 剛剛解鎖了一筆評核分數,內容如下:</p>
+    <ul style="margin:0 0 16px;padding-left:20px;color:#3f3f46;">
+      <li>被評核者:<strong>${evaluateeName}</strong></li>
+      <li>評核者:${evaluatorName}</li>
+      <li>評核類別:${evaluatorRole}評</li>
+      <li>月份:${year} 年 ${month} 月</li>
+      <li>原因:${reason ?? '(未填)'}</li>
+    </ul>
+    <p style="margin:0 0 16px;">這封信是動作備份,所有秘書 / 超管 都會收到。解鎖後員工的這筆評核會變回「待填」,可以重新送出。</p>
+    <a href="${link}" style="display:inline-block;padding:10px 18px;background:#0284c7;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">查看完整解鎖紀錄 →</a>
+  `);
+  const text = `${actorName} 解鎖了 ${evaluateeName} 的 ${year}/${month} ${evaluatorRole}評。原因:${reason ?? '(未填)'}。查看:${link}`;
+  return { subject, html, text };
+}
+
+/**
+ * 後台動作審計通知:解除 LINE 綁定(Becca's add 2026-05-13)。
+ */
+export function buildUnbindLineAuditNotice(opts: {
+  actorName: string;
+  targetName: string;
+  targetEmpNum: string;
+}): { subject: string; html: string; text: string } {
+  const { actorName, targetName, targetEmpNum } = opts;
+  const subject = `[NULLA] LINE 綁定已解除:${targetName}`;
+  const html = shell(`
+    <h2 style="margin:0 0 12px;font-size:18px;color:#18181b;">LINE 綁定解除紀錄</h2>
+    <p style="margin:0 0 8px;">${actorName} 剛剛解除了一位員工的 LINE 綁定,內容如下:</p>
+    <ul style="margin:0 0 16px;padding-left:20px;color:#3f3f46;">
+      <li>對象:<strong>${targetName}</strong>(${targetEmpNum})</li>
+      <li>動作:解除 LINE 綁定</li>
+    </ul>
+    <p style="margin:0 0 8px;">該員工下次點 LINE 登入時,系統會請他輸入員工編號重新綁定。</p>
+    <p style="margin:0;font-size:12px;color:#71717a;">這封信是動作備份,所有秘書 / 超管 都會收到。</p>
+  `);
+  const text = `${actorName} 解除了 ${targetName}(${targetEmpNum})的 LINE 綁定。該員工下次登入時要重新輸入員工編號綁定。`;
+  return { subject, html, text };
+}
+
+/**
  * 一鍵 / 單獨催繳:某人本月還有未完成的評核。
  */
 export function buildReminderNotice(opts: {
