@@ -166,6 +166,11 @@ export default async function Home() {
     emp.admin_role === '會計';
   // 規格 §10:執行長 也能看評核進度(自家)
   const canViewEvalAdmin = isAdmin || emp.position === '執行長';
+  // 歷史匯入:秘書 / 會計 / 超管
+  const canImportHistory =
+    emp.admin_role === '秘書' ||
+    emp.admin_role === '會計' ||
+    emp.admin_role === '超級管理員';
 
   // 本月還沒啟動的時候,Card A 退化成資訊卡(不可點),
   // 啟動表單移到 /admin/evaluations 那邊去做
@@ -338,6 +343,22 @@ export default async function Home() {
             </h2>
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
               看每季加權分數、下載 CSV
+            </p>
+          </Link>
+        )}
+        {canImportHistory && (
+          <Link
+            href="/admin/import-history"
+            className="block rounded-2xl border-2 border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur transition hover:bg-white hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900/60 dark:hover:bg-zinc-900/80"
+          >
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+              歷史匯入
+              <span className="ml-2 text-sm font-normal text-zinc-500 dark:text-zinc-400">
+                (秘書 / 會計專用)
+              </span>
+            </h2>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              把過去紙本月份的評核分數一次匯入(每季一張 Excel)
             </p>
           </Link>
         )}
