@@ -115,11 +115,11 @@ export function buildKickoffNotice(opts: {
   const html = shell(`
     <h2 style="margin:0 0 12px;font-size:18px;color:#18181b;">本月評核開始</h2>
     <p style="margin:0 0 8px;">${recipientName} 您好,</p>
-    <p style="margin:0 0 12px;">${year} 年 ${month} 月評核已經啟動,請進系統填寫您負責的部分(自評 / 主管評 / 執行長評)。</p>
+    <p style="margin:0 0 12px;">${year} 年 ${month} 月評核已經啟動,請進系統填寫本月評核表單。</p>
     <p style="margin:0 0 20px;"><strong>截止時間:${deadlineLabel}</strong></p>
     <a href="${link}" style="display:inline-block;padding:10px 18px;background:#0284c7;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">進系統填寫 →</a>
   `);
-  const text = `${year}/${month} 評核已啟動,請進系統填寫您負責的部分。截止:${deadlineLabel}。${link}`;
+  const text = `${year}/${month} 評核已啟動,請進系統填寫本月評核表單。截止:${deadlineLabel}。${link}`;
   return { subject, html, text };
 }
 

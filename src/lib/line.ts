@@ -85,7 +85,7 @@ export function buildKickoffLine(opts: {
   return [
     `🔔 NULLA 評核啟動`,
     ``,
-    `${opts.recipientName} 您好,${opts.year}/${opts.month} 評核已開始,請進系統填寫您負責的部分。`,
+    `${opts.recipientName} 您好,${opts.year}/${opts.month} 評核已開始,請進系統填寫本月評核表單。`,
     ``,
     `截止:${opts.deadlineLabel}`,
     ``,
