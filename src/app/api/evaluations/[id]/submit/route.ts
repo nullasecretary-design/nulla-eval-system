@@ -120,9 +120,11 @@ export async function POST(
   }
 
   // ---- 自動通知:員工填完自評 → 寄信給主管(spec §3.4)----
-  // 失敗只 log,不影響送出成功。fire-and-forget。
+  // 必須 await — Vercel serverless function 在 response 後立刻 terminate,
+  // 沒 await 的 promise 會被丟掉(本機 dev 不會發生,所以容易漏)。
+  // 失敗只 log,不擋送出成功。
   if (evalRow.evaluator_role === '自評') {
-    notifyManagerAfterSelfEval({
+    await notifyManagerAfterSelfEval({
       evaluateeId: evalRow.evaluatee_id,
       periodId: evalRow.period_id,
     }).catch((e) => console.error('[notify] selfDone failed:', e));
