@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { formatDateTimeTW } from '@/lib/date';
 import { ActivationForm } from '@/app/_components/ActivationForm';
 import { CompletedSection } from './_components/CompletedSection';
 import { RemindButton } from './_components/RemindButton';
@@ -40,16 +41,7 @@ const ROLE_STYLE: Record<Role, { tag: string; chip: string; ring: string }> = {
   },
 };
 
-function formatDateTime(iso: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  const y = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, '0');
-  const da = String(d.getDate()).padStart(2, '0');
-  const h = String(d.getHours()).padStart(2, '0');
-  const mi = String(d.getMinutes()).padStart(2, '0');
-  return `${y}/${mo}/${da} ${h}:${mi}`;
-}
+// 時間格式化用 @/lib/date 的 formatDateTimeTW(統一台北時區)。
 
 export default async function AdminEvaluationsPage() {
   const session = await getSession();
@@ -172,7 +164,7 @@ export default async function AdminEvaluationsPage() {
       title="評核管理"
       subtitle={`${year} 年 ${month} 月 · ${
         period.status === '進行中' ? '進行中' : period.status
-      } · 截止 ${formatDateTime(period.deadline_at)}`}
+      } · 截止 ${formatDateTimeTW(period.deadline_at)}`}
     >
       {/* 三張進度卡 */}
       <div className="grid grid-cols-3 gap-3">
@@ -273,7 +265,7 @@ export default async function AdminEvaluationsPage() {
           role: r.evaluator_role,
           evaluatee: nameOf(r.evaluatee_id),
           evaluator: nameOf(r.evaluator_id),
-          filledAt: formatDateTime(r.filled_at),
+          filledAt: formatDateTimeTW(r.filled_at),
         }))}
       />
 

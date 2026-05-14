@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { formatDateTimeTW } from '@/lib/date';
 
 type Role = '自評' | '主管' | '執行長';
 
@@ -27,15 +28,7 @@ type UnlockLogRow = {
   };
 };
 
-function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  const y = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, '0');
-  const da = String(d.getDate()).padStart(2, '0');
-  const h = String(d.getHours()).padStart(2, '0');
-  const mi = String(d.getMinutes()).padStart(2, '0');
-  return `${y}/${mo}/${da} ${h}:${mi}`;
-}
+// 時間格式化用 @/lib/date 的 formatDateTimeTW(統一台北時區)。
 
 export default async function UnlocksPage() {
   const session = await getSession();
@@ -149,7 +142,7 @@ export default async function UnlocksPage() {
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      {formatDateTime(l.created_at)} · 解鎖人:{name(l.actor_id)}
+                      {formatDateTimeTW(l.created_at)} · 解鎖人:{name(l.actor_id)}
                     </p>
                     {l.reason && (
                       <p className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
