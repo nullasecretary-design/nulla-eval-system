@@ -3,6 +3,7 @@ import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { buildReminderNotice, sendEmail } from '@/lib/email';
 import { buildReminderLine, pushLine } from '@/lib/line';
+import { nowInTaipei } from '@/lib/date';
 
 function bad(message: string, status = 400) {
   return new NextResponse(message, { status });
@@ -48,9 +49,7 @@ export async function POST(request: Request) {
       : null;
 
   // 本月 period
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  const { year, month } = nowInTaipei();
 
   const { data: period } = await supabaseAdmin
     .from('evaluation_periods')

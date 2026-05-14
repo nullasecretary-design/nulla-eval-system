@@ -878,6 +878,12 @@ v0.2 相較於 v0.1 的主要更新:
   - 收件人:**該 org 所有「超級管理員」**(Becca 從原規格「超管+會計」簡化成「只超管」)
   - 內容:對象姓名 + 員工編號 + 變更前 → 變更後 + 變更者
   - 沒做獨立 audit 資料庫表 — Becca 決定:email 留底就夠用,不寫表(YAGNI)
+- ✅ **修「現在年月」時區 bug**(2026-05-14)
+  - cc4ce81 修了 admin 頁的顯示時間時區,這次補上的是「server 端拿本月年月」的同類 bug
+  - 學長們散佈在 6 個地方都寫 `new Date().getMonth() + 1`,Vercel 跑 UTC,台北凌晨 0-8 點剛跨月的話會抓到「上個月」
+  - 影響面:員工首頁 / 員工評核頁 / 評核管理頁 / 啟動評核 API / 催繳 API / 季度報表 subtitle 「產出於」日期
+  - 最壞情況:每月 1 號台北凌晨 0-8 點秘書按啟動 → 會寫到「上個月」的 evaluation_periods
+  - 解法:`src/lib/date.ts` 加 `nowInTaipei()` helper,6 個檔案全部改用它(`Intl.DateTimeFormat` + `timeZone: 'Asia/Taipei'`)
 - ⏳ Vercel 部署 — 下一步
 - ⏳ LINE 重綁(規格 §4.4)— 下一步
 

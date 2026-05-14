@@ -3,6 +3,7 @@ import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { buildKickoffNotice, sendEmail } from '@/lib/email';
 import { buildKickoffLine, pushLine } from '@/lib/line';
+import { nowInTaipei } from '@/lib/date';
 
 function formatDeadlineLabel(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -44,8 +45,7 @@ export async function POST(request: Request) {
   if (deadline.getTime() <= Date.now()) return bad('截止日必須晚於現在');
 
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  const { year, month } = nowInTaipei();
 
   // 月初 cron 會建一筆 status='待啟動' 的 row。秘書啟動時:
   //   - 沒 row → INSERT 一筆 '進行中' 的 row

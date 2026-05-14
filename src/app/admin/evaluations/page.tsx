@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { formatDateTimeTW } from '@/lib/date';
+import { formatDateTimeTW, nowInTaipei } from '@/lib/date';
 import { ActivationForm } from '@/app/_components/ActivationForm';
 import { CompletedSection } from './_components/CompletedSection';
 import { RemindButton } from './_components/RemindButton';
@@ -64,9 +64,7 @@ export default async function AdminEvaluationsPage() {
   const canUnlock =
     actor.admin_role === '秘書' || actor.admin_role === '超級管理員';
 
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  const { year, month } = nowInTaipei();
 
   const { data: period } = await supabaseAdmin
     .from('evaluation_periods')

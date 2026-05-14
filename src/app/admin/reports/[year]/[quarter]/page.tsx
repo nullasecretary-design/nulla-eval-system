@@ -8,6 +8,7 @@ import {
   quarterMonths,
   type EmployeeRow,
 } from '../../_lib/quarter';
+import { nowInTaipei } from '@/lib/date';
 
 function fmt(n: number | null): string {
   if (n === null) return '—';
@@ -71,10 +72,9 @@ export default async function QuarterReportPage({
   const months = quarterMonths(quarter);
   const missingCount = data.rows.filter((r) => r.hasMissing).length;
 
-  const today = new Date();
-  const today_y = today.getFullYear();
-  const today_m = String(today.getMonth() + 1).padStart(2, '0');
-  const today_d = String(today.getDate()).padStart(2, '0');
+  const { year: today_y, month: tm, day: td } = nowInTaipei();
+  const today_m = String(tm).padStart(2, '0');
+  const today_d = String(td).padStart(2, '0');
 
   return (
     <Shell

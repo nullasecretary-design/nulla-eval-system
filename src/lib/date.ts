@@ -19,6 +19,13 @@ const TW_DATETIME_FORMATTER = new Intl.DateTimeFormat('zh-TW', {
   hour12: false,
 });
 
+const TW_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Taipei',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 /**
  * 把 ISO 字串(例如 DB timestamptz)格式化成「YYYY/MM/DD HH:mm」台北時區。
  * null / 無效輸入回 '—'。
@@ -30,4 +37,15 @@ export function formatDateTimeTW(iso: string | null | undefined): string {
   const parts = TW_DATETIME_FORMATTER.formatToParts(d);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
   return `${get('year')}/${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`;
+}
+
+/**
+ * 回傳「現在台北時區」的 year / month / day(都是 number)。
+ * 解掉 Vercel server 跑 UTC 時,凌晨 0-8 點 `new Date().getMonth()` 還停在昨天的 bug。
+ */
+export function nowInTaipei(): { year: number; month: number; day: number } {
+  const parts = TW_DATE_FORMATTER.formatToParts(new Date());
+  const get = (type: string) =>
+    Number(parts.find((p) => p.type === type)?.value);
+  return { year: get('year'), month: get('month'), day: get('day') };
 }

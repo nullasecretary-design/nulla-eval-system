@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { nowInTaipei } from '@/lib/date';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -80,9 +81,7 @@ export default async function Home() {
   if (!emp) redirect('/login');
 
   // Current month's evaluation period (per the user's org)
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  const { year, month } = nowInTaipei();
 
   const { data: period } = await supabaseAdmin
     .from('evaluation_periods')
